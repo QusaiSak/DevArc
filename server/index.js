@@ -24,9 +24,6 @@ app.use(cookieParser());
 
 // Routes
 app.get('/auth/github', (req, res) => {
-  console.log('=== GITHUB REDIRECT DEBUG ===');
-  console.log('Client ID being used:', GITHUB_CLIENT_ID);
-  console.log('Client URL:', process.env.CLIENT_URL);
   
   if (!GITHUB_CLIENT_ID) {
     return res.status(500).json({ error: 'GitHub Client ID not configured' });
@@ -71,9 +68,6 @@ app.post('/auth/github/callback', async (req, res) => {
         'User-Agent': 'DevArc-App',
       },
     });
-
-    console.log('Token response status:', tokenResponse.status);
-    console.log('Token response data:', tokenResponse.data);
 
     const { access_token, error, error_description } = tokenResponse.data;
 
@@ -186,6 +180,27 @@ app.get('/auth/me', (req, res) => {
 app.post('/auth/logout', (req, res) => {
   res.clearCookie('auth_token');
   res.json({ success: true });
+});
+
+
+
+// Get GitHub access token for frontend use
+app.get('/api/github-token', (req, res) => {
+  const token = req.cookies.auth_token;
+  
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Not authenticated' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    res.json({
+      success: true,
+      access_token: decoded.access_token,
+    });
+  } catch (error) {
+    res.status(401).json({ success: false, error: 'Invalid token' });
+  }
 });
 
 app.listen(PORT, () => {

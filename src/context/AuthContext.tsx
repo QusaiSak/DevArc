@@ -41,8 +41,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const login = () => {
+    // Store the current URL to redirect back after login
+    localStorage.setItem('returnUrl', window.location.pathname)
     window.location.href = 'http://localhost:4000/auth/github'
   }
+
+  // Add this useEffect to handle redirect after login
+  useEffect(() => {
+    const returnUrl = localStorage.getItem('returnUrl')
+    if (returnUrl && user) {
+      localStorage.removeItem('returnUrl')
+      // Don't redirect if already on the return URL
+      if (window.location.pathname !== returnUrl) {
+        window.location.href = returnUrl
+      }
+    }
+  }, [user])
 
   const logout = async () => {
     try {
