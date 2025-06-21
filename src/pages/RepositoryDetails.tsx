@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
-  GitBranch, 
   Star, 
   GitFork, 
   Calendar, 
@@ -14,13 +13,11 @@ import {
   BarChart3,
   Loader2,
   AlertCircle,
-  CheckCircle,
   Github,
   Eye,
   GitCommit,
   Users,
   Clock,
-  Zap,
   Target,
   FileCode,
   Bug
@@ -40,7 +37,6 @@ import type { ComprehensiveDocumentation } from '@/types/codeparser.interface'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { FavoriteButton } from '@/components/FavoriteButton'
 import { toast } from 'sonner'
 
 interface RepositoryData {
@@ -127,16 +123,28 @@ export default function RepositoryDetailsPage() {
       getAnalysis(user.id, projectId)
         .then(({ analysis }) => {
           if (analysis.structure) {
-            setAnalysis(prev => ({ ...prev, structure: JSON.parse(analysis.structure) }));
+            setAnalysis(prev => ({
+              ...prev,
+              structure: typeof analysis.structure === 'string' ? JSON.parse(analysis.structure) : analysis.structure,
+            }));
           }
           if (analysis.codeAnalysis) {
-            setAnalysis(prev => ({ ...prev, codeAnalysis: JSON.parse(analysis.codeAnalysis) }));
+            setAnalysis(prev => ({
+              ...prev,
+              codeAnalysis: typeof analysis.codeAnalysis === 'string' ? JSON.parse(analysis.codeAnalysis) : analysis.codeAnalysis,
+            }));
           }
           if (analysis.documentation) {
-            setAnalysis(prev => ({ ...prev, documentation: JSON.parse(analysis.documentation) }));
+            setAnalysis(prev => ({
+              ...prev,
+              documentation: typeof analysis.documentation === 'string' ? JSON.parse(analysis.documentation) : analysis.documentation,
+            }));
           }
           if (analysis.testCases) {
-            setAnalysis(prev => ({ ...prev, testCases: JSON.parse(analysis.testCases) }));
+            setAnalysis(prev => ({
+              ...prev,
+              testCases: typeof analysis.testCases === 'string' ? JSON.parse(analysis.testCases) : analysis.testCases,
+            }));
           }
         })
         .catch(() => {
@@ -168,19 +176,23 @@ export default function RepositoryDetailsPage() {
         setReadme(readmeContent);
 
         const commitsData = await githubService.fetch(`repos/${owner}/${repo}/commits`);
-        setCommits(
-          commitsData.map((commit: any) => ({
-            sha: commit.sha,
-            commit: {
-              message: commit.commit.message,
-              author: {
-                name: commit.commit.author?.name || 'Unknown',
-                date: commit.commit.author?.date || 'Unknown',
+        if (Array.isArray(commitsData)) {
+          setCommits(
+            commitsData.map((commit: any) => ({
+              sha: commit.sha,
+              commit: {
+                message: commit.commit.message,
+                author: {
+                  name: commit.commit.author?.name || 'Unknown',
+                  date: commit.commit.author?.date || 'Unknown',
+                },
               },
-            },
-            html_url: commit.html_url,
-          }))
-        );
+              html_url: commit.html_url,
+            }))
+          );
+        } else {
+          setCommits([]);
+        }
       } catch (error) {
         console.error('Error fetching repository data:', error);
         setError('Failed to fetch repository data');
@@ -232,9 +244,15 @@ export default function RepositoryDetailsPage() {
   }
 
   const storeAnalysis = async () => {
-    if (!owner || !repo || !user || !analysis) {
+    if (!owner || !repo || !user) {
       console.error('Missing data for storing analysis')
       toast.error('Missing data for storing analysis')
+      return
+    }
+
+    // Check what analysis data is available
+    if (!analysis.structure && !analysis.codeAnalysis && !analysis.documentation && !analysis.testCases) {
+      toast.error('No analysis data to store. Please run analysis first.')
       return
     }
 
@@ -243,8 +261,8 @@ export default function RepositoryDetailsPage() {
       await saveAnalysis(user.id, {
         projectId,
         projectName: repository?.name || `${owner}/${repo}`,
-        structure: JSON.stringify(analysis.structure),
-        codeAnalysis:  analysis.codeAnalysis?JSON.stringify(analysis.codeAnalysis):null,
+        structure: analysis.structure ? JSON.stringify(analysis.structure) : null,
+        codeAnalysis: analysis.codeAnalysis ? JSON.stringify(analysis.codeAnalysis) : null,
         documentation: analysis.documentation ? JSON.stringify(analysis.documentation) : null,
         testCases: analysis.testCases ? JSON.stringify(analysis.testCases) : null,
       });
@@ -255,7 +273,6 @@ export default function RepositoryDetailsPage() {
     } catch (error) {
       console.error('Failed to store analysis:', error)
       toast.error('Failed to store analysis. Please try again.')
-      setError('Failed to store analysis. Please try again.')
     }
   }
 
@@ -282,15 +299,9 @@ export default function RepositoryDetailsPage() {
         documentation,
       }));
       
-      // Save documentation to backend
-      if (owner && repo && user) {
-        const projectId = `${owner}/${repo}`;
-        await saveAnalysis(user.id, {
-          projectId,
-          projectName: repository?.name || `${owner}/${repo}`,
-          documentation: JSON.stringify(documentation),
-        });
-      }
+      // DON'T automatically save - only update local state
+      console.log('Documentation generated successfully - ready to store');
+      
     } catch (error) {
       console.error('Documentation generation failed:', error);
       setError('Documentation generation failed. Please try again.');
@@ -299,7 +310,6 @@ export default function RepositoryDetailsPage() {
     }
   };
 
-  // Update the component to use user-specific storage in the generateTestCases function
   const generateTestCases = async () => {
     if (!owner || !repo || !user) return;
 
@@ -334,15 +344,9 @@ export default function RepositoryDetailsPage() {
         testCases: updatedTestCases,
       }));
 
-      // Save test results to backend
-      if (user && owner && repo) {
-        const projectId = `${owner}/${repo}`;
-        await saveAnalysis(user.id, {
-          projectId,
-          projectName: repository?.name || `${owner}/${repo}`,
-          testCases: JSON.stringify(updatedTestCases),
-        });
-      }
+      // DON'T automatically save - only update local state
+      console.log('Test cases generated successfully - ready to store');
+      
     } catch (error) {
       console.error('Test generation failed:', error);
       setError('Test generation failed. Please try again.');
@@ -367,95 +371,6 @@ export default function RepositoryDetailsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // Helper function to filter out non-code files
-  const isCodeFile = (filePath: string): boolean => {
-    if (!filePath) return false;
-
-    // Define file extensions that should be excluded (non-code files)
-    const excludedExtensions = [
-      // Images
-      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico', '.webp', '.tiff', '.tif',
-      // Videos
-      '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v',
-      // Audio
-      '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a',
-      // Documents
-      '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.rtf',
-      // Archives
-      '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz',
-      // Fonts
-      '.ttf', '.otf', '.woff', '.woff2', '.eot',
-      // Binary/executables
-      '.exe', '.dll', '.so', '.dylib', '.bin', '.deb', '.rpm',
-      // Database
-      '.db', '.sqlite', '.sqlite3', '.mdb',
-      // Logs
-      '.log', '.logs',
-      // Temporary files
-      '.tmp', '.temp', '.bak', '.swp', '.cache',
-      // Lock files
-      '.lock', 
-      // Map files
-      '.map'
-    ];
-
-    // Define directories that should be excluded
-    const excludedDirectories = [
-      'node_modules/', 'dist/', 'build/', 'target/', 'bin/', 'obj/', 
-      '.git/', '.svn/', '.hg/', '.vscode/', '.idea/', 
-      '__pycache__/', '.pytest_cache/', 'coverage/', 
-      'vendor/', 'public/assets/', 'assets/images/', 'static/images/',
-      'images/', 'img/', 'pics/', 'pictures/', 'media/', 'uploads/'
-    ];
-
-    // Define code file extensions
-    const codeExtensions = [
-      // Web technologies
-      '.js', '.ts', '.jsx', '.tsx', '.vue', '.svelte',
-      '.html', '.htm', '.css', '.scss', '.sass', '.less', '.styl',
-      // Backend languages
-      '.py', '.java', '.c', '.cpp', '.cxx', '.cc', '.h', '.hpp',
-      '.cs', '.vb', '.php', '.rb', '.go', '.rs', '.kt', '.scala',
-      '.swift', '.m', '.mm', '.pl', '.pm', '.r', '.jl', '.lua',
-      // Functional languages
-      '.hs', '.elm', '.clj', '.cljs', '.fs', '.fsx', '.ml', '.mli',
-      // Scripts and configs (that contain code logic)
-      '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd',
-      '.dockerfile', '.makefile', '.cmake', '.gradle', '.sbt',
-      // Data/Config files that might contain logic
-      '.json', '.yaml', '.yml', '.toml', '.xml', '.plist',
-      '.env', '.ini', '.cfg', '.conf', '.properties',
-      // Documentation that might contain code
-      '.md', '.rst', '.txt', '.adoc'
-    ];
-
-    const lowerPath = filePath.toLowerCase();
-
-    // Check if file is in excluded directory
-    for (const dir of excludedDirectories) {
-      if (lowerPath.includes(dir)) {
-        return false;
-      }
-    }
-
-    // Check if file has excluded extension
-    for (const ext of excludedExtensions) {
-      if (lowerPath.endsWith(ext)) {
-        return false;
-      }
-    }
-
-    // Check if file has code extension
-    for (const ext of codeExtensions) {
-      if (lowerPath.endsWith(ext)) {
-        return true;
-      }
-    }
-
-    // If no extension matches, exclude by default
-    return false;
-  };
-
   // Export documentation to Word format
   const exportToWord = async (documentation: ComprehensiveDocumentation) => {
     try {
@@ -464,196 +379,196 @@ export default function RepositoryDetailsPage() {
 # ${repository?.name || 'Repository'} Documentation
 
 ## Project Summary
-${documentation.summary}
+${documentation.summary || 'No summary available'}
 
 ## Architecture Overview
-**Pattern**: ${documentation.architecture.pattern}
-**Description**: ${documentation.architecture.description}
+**Pattern**: ${documentation.architecture?.pattern || 'Unknown pattern'}
+**Description**: ${documentation.architecture?.description || 'No description available'}
 
 ### Technologies Used
-${documentation.architecture.technologies.map(tech => `- ${tech}`).join('\n')}
+${documentation.architecture?.technologies?.map(tech => `- ${tech}`).join('\n') || 'No technologies specified'}
 
 ### Architecture Layers
-${documentation.architecture.layers.map(layer => `
+${documentation.architecture?.layers?.map(layer => `
 **${layer.name}**
 ${layer.description}
-Components: ${layer.components.join(', ')}
-`).join('\n')}
+Components: ${layer.components?.join(', ') || 'None'}
+`).join('\n') || 'No architecture layers defined'}
 
 ## Folder Structure
 \`\`\`
-${documentation.folderStructure.tree}
+${documentation.folderStructure?.tree || 'No folder structure available'}
 \`\`\`
 
 ### Directory Details
-${documentation.folderStructure.directories.map(dir => `
+${documentation.folderStructure?.directories?.map(dir => `
 **${dir.path}** (${dir.type})
 Purpose: ${dir.purpose}
 Files: ${dir.fileCount}
 ${dir.description}
-`).join('\n')}
+`).join('\n') || 'No directory details available'}
 
 ## Code Internals
 
 ### Code Flow
-${documentation.codeInternals.codeFlow}
+${documentation.codeInternals?.codeFlow || 'No code flow description available'}
 
 ### Data Flow
-${documentation.codeInternals.dataFlow}
+${documentation.codeInternals?.dataFlow || 'No data flow description available'}
 
 ### Key Algorithms
-${documentation.codeInternals.keyAlgorithms.map(algo => `
+${documentation.codeInternals?.keyAlgorithms?.map(algo => `
 **${algo.name}** (${algo.file})
 ${algo.description}
 Implementation: ${algo.implementation}
 Complexity: ${algo.complexity}
-`).join('\n')}
+`).join('\n') || 'No key algorithms documented'}
 
 ### Design Patterns
-${documentation.codeInternals.designPatterns.map(pattern => `
+${documentation.codeInternals?.designPatterns?.map(pattern => `
 **${pattern.pattern}**
 Usage: ${pattern.usage}
-Files: ${pattern.files.join(', ')}
+Files: ${pattern.files?.join(', ') || 'None'}
 ${pattern.description}
-`).join('\n')}
+`).join('\n') || 'No design patterns documented'}
 
 ### Business Logic
-${documentation.codeInternals.businessLogic.map(logic => `
+${documentation.codeInternals?.businessLogic?.map(logic => `
 **${logic.module}**
 Purpose: ${logic.purpose}
 Workflow: ${logic.workflow}
-Files: ${logic.files.join(', ')}
-`).join('\n')}
+Files: ${logic.files?.join(', ') || 'None'}
+`).join('\n') || 'No business logic documented'}
 
 ## SDLC Documentation
 
 ### Development Workflow
-${documentation.sdlc.developmentWorkflow}
+${documentation.sdlc?.developmentWorkflow || 'No development workflow documented'}
 
 ### Setup Instructions
-${documentation.sdlc.setupInstructions.map(step => `
+${documentation.sdlc?.setupInstructions?.map(step => `
 ${step.step}. **${step.title}**
    ${step.description}
    \`\`\`bash
-   ${step.commands.join('\n   ')}
+   ${step.commands?.join('\n   ') || 'No commands'}
    \`\`\`
-`).join('\n')}
+`).join('\n') || 'No setup instructions available'}
 
 ### Build Process
-${documentation.sdlc.buildProcess.description}
+${documentation.sdlc?.buildProcess?.description || 'No build process documented'}
 
 **Steps:**
-${documentation.sdlc.buildProcess.steps.map(step => `- ${step}`).join('\n')}
+${documentation.sdlc?.buildProcess?.steps?.map(step => `- ${step}`).join('\n') || 'No build steps documented'}
 
 **Tools:**
-${documentation.sdlc.buildProcess.tools.map(tool => `- ${tool}`).join('\n')}
+${documentation.sdlc?.buildProcess?.tools?.map(tool => `- ${tool}`).join('\n') || 'No build tools documented'}
 
 ### Testing Strategy
-**Approach:** ${documentation.sdlc.testingStrategy.approach}
-**Coverage:** ${documentation.sdlc.testingStrategy.coverage}
+**Approach:** ${documentation.sdlc?.testingStrategy?.approach || 'No testing approach documented'}
+**Coverage:** ${documentation.sdlc?.testingStrategy?.coverage || 'Unknown'}
 
 **Test Types:**
-${documentation.sdlc.testingStrategy.testTypes.map(type => `- ${type}`).join('\n')}
+${documentation.sdlc?.testingStrategy?.testTypes?.map(type => `- ${type}`).join('\n') || 'No test types documented'}
 
 **Frameworks:**
-${documentation.sdlc.testingStrategy.frameworks.map(framework => `- ${framework}`).join('\n')}
+${documentation.sdlc?.testingStrategy?.frameworks?.map(framework => `- ${framework}`).join('\n') || 'No testing frameworks documented'}
 
 ### Deployment Guide
-${documentation.sdlc.deploymentGuide.process}
+${documentation.sdlc?.deploymentGuide?.process || 'No deployment process documented'}
 
-**Environments:** ${documentation.sdlc.deploymentGuide.environments.join(', ')}
+**Environments:** ${documentation.sdlc?.deploymentGuide?.environments?.join(', ') || 'No environments specified'}
 
-${documentation.sdlc.deploymentGuide.steps.map(envStep => `
+${documentation.sdlc?.deploymentGuide?.steps?.map(envStep => `
 **${envStep.environment}:**
-${envStep.steps.map(step => `- ${step}`).join('\n')}
-`).join('\n')}
+${envStep.steps?.map(step => `- ${step}`).join('\n') || 'No steps specified'}
+`).join('\n') || 'No deployment steps documented'}
 
 ### Maintenance
 **Guidelines:**
-${documentation.sdlc.maintenance.guidelines.map(guide => `- ${guide}`).join('\n')}
+${documentation.sdlc?.maintenance?.guidelines?.map(guide => `- ${guide}`).join('\n') || 'No maintenance guidelines documented'}
 
 **Monitoring:**
-${documentation.sdlc.maintenance.monitoring.map(monitor => `- ${monitor}`).join('\n')}
+${documentation.sdlc?.maintenance?.monitoring?.map(monitor => `- ${monitor}`).join('\n') || 'No monitoring information documented'}
 
 **Troubleshooting:**
-${documentation.sdlc.maintenance.troubleshooting.map(trouble => `
+${documentation.sdlc?.maintenance?.troubleshooting?.map(trouble => `
 **Issue:** ${trouble.issue}
 **Solution:** ${trouble.solution}
-`).join('\n')}
+`).join('\n') || 'No troubleshooting information documented'}
 
 ## System Architecture Diagram (Mermaid)
 \`\`\`mermaid
-${documentation.mermaidDiagram}
+${documentation.mermaidDiagram || 'No architecture diagram available'}
 \`\`\`
 
-## Components (${documentation.components.length})
-${documentation.components.map(component => `
+## Components (${documentation.components?.length || 0})
+${documentation.components?.map(component => `
 ### ${component.name} (${component.type})
 **File**: ${component.file}
 **Description**: ${component.description}
 
 **Internals:**
-- Purpose: ${component.internals.purpose}
-- Key Methods: ${component.internals.keyMethods.join(', ')}
-- State Management: ${component.internals.stateManagement}
-- Lifecycle: ${component.internals.lifecycle}
+- Purpose: ${component.internals?.purpose || 'Unknown'}
+- Key Methods: ${component.internals?.keyMethods?.join(', ') || 'None'}
+- State Management: ${component.internals?.stateManagement || 'Unknown'}
+- Lifecycle: ${component.internals?.lifecycle || 'Unknown'}
 
-**Dependencies**: ${component.dependencies.join(', ')}
-**Exports**: ${component.exports.join(', ')}
-`).join('\n')}
+**Dependencies**: ${component.dependencies?.join(', ') || 'None'}
+**Exports**: ${component.exports?.join(', ') || 'None'}
+`).join('\n') || 'No components documented'}
 
-## API Endpoints (${documentation.apis.length})
-${documentation.apis.map(api => `
+## API Endpoints (${documentation.apis?.length || 0})
+${documentation.apis?.map(api => `
 ### ${api.method} ${api.endpoint}
 **Description**: ${api.description}
 
 **Parameters**:
-${api.parameters.map(param => `- **${param.name}** (${param.type}): ${param.description}`).join('\n')}
+${api.parameters?.map(param => `- **${param.name}** (${param.type}): ${param.description}`).join('\n') || 'No parameters'}
 
 **Response**: ${api.response}
 
 **Implementation Details:**
-- Implementation: ${api.internals.implementation}
-- Validation: ${api.internals.validation}
-- Error Handling: ${api.internals.errorHandling}
-- Authentication: ${api.internals.authentication}
-`).join('\n')}
+- Implementation: ${api.internals?.implementation || 'Unknown'}
+- Validation: ${api.internals?.validation || 'Unknown'}
+- Error Handling: ${api.internals?.errorHandling || 'Unknown'}
+- Authentication: ${api.internals?.authentication || 'Unknown'}
+`).join('\n') || 'No API endpoints documented'}
 
-## Functions & Methods (${documentation.functions.length})
-${documentation.functions.map(func => `
+## Functions & Methods (${documentation.functions?.length || 0})
+${documentation.functions?.map(func => `
 ### ${func.name} (${func.type})
 **File**: ${func.file}
 **Description**: ${func.description}
 
 **Parameters**:
-${func.parameters.map(param => `- **${param.name}** (${param.type}): ${param.description}`).join('\n')}
+${func.parameters?.map(param => `- **${param.name}** (${param.type}): ${param.description}`).join('\n') || 'No parameters'}
 
-**Returns**: ${func.returns.type} - ${func.returns.description}
+**Returns**: ${func.returns?.type || 'void'} - ${func.returns?.description || 'No description'}
 
 **Internal Details:**
-- Algorithm: ${func.internals.algorithm}
-- Complexity: ${func.internals.complexity}
-- Side Effects: ${func.internals.sideEffects}
-- Dependencies: ${func.internals.dependencies.join(', ')}
-`).join('\n')}
+- Algorithm: ${func.internals?.algorithm || 'Unknown'}
+- Complexity: ${func.internals?.complexity || 'Unknown'}
+- Side Effects: ${func.internals?.sideEffects || 'None'}
+- Dependencies: ${func.internals?.dependencies?.join(', ') || 'None'}
+`).join('\n') || 'No functions documented'}
 
-## Data Models & Interfaces (${documentation.dataModels.length})
-${documentation.dataModels.map(model => `
+## Data Models & Interfaces (${documentation.dataModels?.length || 0})
+${documentation.dataModels?.map(model => `
 ### ${model.name} (${model.type})
 **File**: ${model.file}
 
 **Properties**:
-${model.properties.map(prop => `- **${prop.name}** (${prop.type}): ${prop.description}`).join('\n')}
+${model.properties?.map(prop => `- **${prop.name}** (${prop.type}): ${prop.description}`).join('\n') || 'No properties documented'}
 
 **Relationships**:
-${model.relationships.map(rel => `- ${rel.model} (${rel.type}): ${rel.description}`).join('\n')}
+${model.relationships?.map(rel => `- ${rel.model} (${rel.type}): ${rel.description}`).join('\n') || 'No relationships documented'}
 
 **Validation**:
-${model.validation.map(rule => `- ${rule}`).join('\n')}
-`).join('\n')}
+${model.validation?.map(rule => `- ${rule}`).join('\n') || 'No validation rules documented'}
+`).join('\n') || 'No data models documented'}
 
 ## Usage Examples
-${documentation.examples.map(example => `
+${documentation.examples?.map(example => `
 ### ${example.title}
 ${example.description}
 
@@ -662,7 +577,7 @@ ${example.code}
 \`\`\`
 
 **Explanation:** ${example.explanation}
-`).join('\n')}
+`).join('\n') || 'No usage examples documented'}
 
 ---
 *Generated on ${new Date().toLocaleDateString()} for ${repository?.full_name || 'Repository'}*
@@ -1123,22 +1038,56 @@ ${example.code}
                     <div className="space-y-6">
                       <div>
                         <h3 className="text-lg font-semibold mb-2">Project Summary</h3>
-                        <p className="text-gray-600 dark:text-gray-400">{analysis.documentation.summary}</p>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {typeof analysis.documentation.summary === 'string' 
+                            ? analysis.documentation.summary 
+                            : typeof analysis.documentation.summary === 'object' 
+                              ? JSON.stringify(analysis.documentation.summary) 
+                              : 'No summary available'}
+                        </p>
                       </div>
 
                       <div>
                         <h3 className="text-lg font-semibold mb-2">Architecture Overview</h3>
                         <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                          <p className="font-medium">Pattern: {analysis.documentation.architecture.pattern}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{analysis.documentation.architecture.description}</p>
+                          <p className="font-medium">
+                            Pattern: {typeof analysis.documentation.architecture?.pattern === 'string' 
+                              ? analysis.documentation.architecture.pattern 
+                              : 'Unknown pattern'}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {typeof analysis.documentation.architecture?.description === 'string' 
+                              ? analysis.documentation.architecture.description 
+                              : 'No description available'}
+                          </p>
                           <div className="mt-2">
                             <span className="text-sm font-medium">Technologies: </span>
-                            {analysis.documentation.architecture.technologies.map((tech, index) => (
+                            {analysis.documentation.architecture?.technologies?.map((tech, index) => (
                               <Badge key={index} variant="secondary" className="mr-1">
-                                {tech}
+                                {typeof tech === 'string' ? tech : 'Unknown'}
                               </Badge>
-                            ))}
+                            )) || <span className="text-sm text-gray-500">No technologies specified</span>}
                           </div>
+                          
+                          {/* Show Architecture Layers if available */}
+                          {analysis.documentation.architecture?.layers?.length > 0 && (
+                            <div className="mt-4">
+                              <h4 className="text-sm font-semibold mb-2">Architecture Layers:</h4>
+                              <div className="space-y-2">
+                                {analysis.documentation.architecture.layers.map((layer, index) => (
+                                  <div key={index} className="border-l-2 border-blue-500 pl-3">
+                                    <p className="font-medium text-sm">{layer.name}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">{layer.description}</p>
+                                    {layer.components?.length > 0 && (
+                                      <p className="text-xs text-gray-500">
+                                        Components: {layer.components.join(', ')}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1146,8 +1095,28 @@ ${example.code}
                         <div>
                           <h3 className="text-lg font-semibold mb-2">Folder Structure</h3>
                           <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-sm overflow-x-auto">
-                            {analysis.documentation.folderStructure.tree}
+                            {analysis.documentation.folderStructure?.tree}
                           </pre>
+                          
+                          {/* Show Directory Details if available */}
+                          {analysis.documentation.folderStructure?.directories?.length > 0 && (
+                            <div className="mt-4">
+                              <h4 className="text-sm font-semibold mb-2">Directory Details:</h4>
+                              <div className="space-y-2">
+                                {analysis.documentation.folderStructure.directories.map((dir, index) => (
+                                  <div key={index} className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="font-medium text-sm">{dir.path}</span>
+                                      <Badge variant="outline" className="text-xs">{dir.type}</Badge>
+                                    </div>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">{dir.purpose}</p>
+                                    <p className="text-xs text-gray-500">{dir.description}</p>
+                                    <p className="text-xs text-gray-500">Files: {dir.fileCount}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1157,16 +1126,80 @@ ${example.code}
                           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                             <div>
                               <span className="font-medium">Code Flow: </span>
-                              <span className="text-sm">{analysis.documentation.codeInternals.codeFlow}</span>
+                              <span className="text-sm">
+                                {typeof analysis.documentation.codeInternals.codeFlow === 'string' 
+                                  ? analysis.documentation.codeInternals.codeFlow 
+                                  : 'No code flow description available'}
+                              </span>
                             </div>
                             <div>
                               <span className="font-medium">Data Flow: </span>
-                              <span className="text-sm">{analysis.documentation.codeInternals.dataFlow}</span>
+                              <span className="text-sm">
+                                {typeof analysis.documentation.codeInternals.dataFlow === 'string' 
+                                  ? analysis.documentation.codeInternals.dataFlow 
+                                  : 'No data flow description available'}
+                              </span>
                             </div>
-                            {analysis.documentation.codeInternals.keyAlgorithms.length > 0 && (
+                            {analysis.documentation.codeInternals.keyAlgorithms?.length > 0 && (
                               <div>
                                 <span className="font-medium">Key Algorithms: </span>
-                                <span className="text-sm">{analysis.documentation.codeInternals.keyAlgorithms.length} documented</span>
+                                <span className="text-sm">{analysis.documentation.codeInternals.keyAlgorithms?.length || 0} documented</span>
+                              </div>
+                            )}
+                            
+                            {/* Show Key Algorithms Details */}
+                            {analysis.documentation.codeInternals.keyAlgorithms?.length > 0 && (
+                              <div className="mt-4">
+                                <h4 className="text-sm font-semibold mb-2">Algorithm Details:</h4>
+                                <div className="space-y-3">
+                                  {analysis.documentation.codeInternals.keyAlgorithms.map((algo, index) => (
+                                    <div key={index} className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="font-medium text-sm">{algo.name}</span>
+                                        <Badge variant="outline" className="text-xs">{algo.complexity}</Badge>
+                                      </div>
+                                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">File: {algo.file}</p>
+                                      <p className="text-xs text-gray-500 mb-1">{algo.description}</p>
+                                      <p className="text-xs text-gray-500">Implementation: {algo.implementation}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Show Design Patterns */}
+                            {analysis.documentation.codeInternals.designPatterns?.length > 0 && (
+                              <div className="mt-4">
+                                <h4 className="text-sm font-semibold mb-2">Design Patterns:</h4>
+                                <div className="space-y-3">
+                                  {analysis.documentation.codeInternals.designPatterns.map((pattern, index) => (
+                                    <div key={index} className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="font-medium text-sm">{pattern.pattern}</span>
+                                      </div>
+                                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Usage: {pattern.usage}</p>
+                                      <p className="text-xs text-gray-500 mb-1">{pattern.description}</p>
+                                      <p className="text-xs text-gray-500">Files: {pattern.files?.join(', ')}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Show Business Logic */}
+                            {analysis.documentation.codeInternals.businessLogic?.length > 0 && (
+                              <div className="mt-4">
+                                <h4 className="text-sm font-semibold mb-2">Business Logic:</h4>
+                                <div className="space-y-3">
+                                  {analysis.documentation.codeInternals.businessLogic.map((logic, index) => (
+                                    <div key={index} className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                      <span className="font-medium text-sm">{logic.module}</span>
+                                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Purpose: {logic.purpose}</p>
+                                      <p className="text-xs text-gray-500 mb-1">Workflow: {logic.workflow}</p>
+                                      <p className="text-xs text-gray-500">Files: {logic.files?.join(', ')}</p>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1179,29 +1212,41 @@ ${example.code}
                           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
                             <div>
                               <span className="font-medium">Development Workflow: </span>
-                              <span className="text-sm">{analysis.documentation.sdlc.developmentWorkflow}</span>
+                              <span className="text-sm">
+                                {typeof analysis.documentation.sdlc.developmentWorkflow === 'string' 
+                                  ? analysis.documentation.sdlc.developmentWorkflow 
+                                  : 'No workflow description available'}
+                              </span>
                             </div>
                             <div>
                               <span className="font-medium">Setup Instructions: </span>
-                              <span className="text-sm">{analysis.documentation.sdlc.setupInstructions.length} steps documented</span>
+                              <span className="text-sm">{analysis.documentation.sdlc.setupInstructions?.length || 0} steps documented</span>
                             </div>
                             <div>
                               <span className="font-medium">Testing Strategy: </span>
-                              <span className="text-sm">{analysis.documentation.sdlc.testingStrategy.approach}</span>
+                              <span className="text-sm">
+                                {typeof analysis.documentation.sdlc.testingStrategy?.approach === 'string' 
+                                  ? analysis.documentation.sdlc.testingStrategy.approach 
+                                  : 'No testing strategy available'}
+                              </span>
                             </div>
                           </div>
                         </div>
                       )}
 
-                      {analysis.documentation.functions.length > 0 && (
+                      {analysis.documentation.functions?.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold mb-4">Functions ({analysis.documentation.functions.length})</h3>
+                          <h3 className="text-lg font-semibold mb-4">Functions ({analysis.documentation.functions?.length || 0})</h3>
                           <div className="space-y-4 max-h-96 overflow-y-auto">
                             {analysis.documentation.functions.slice(0, 5).map((func, index) => (
                               <Card key={index}>
                                 <CardContent className="pt-4">
-                                  <h4 className="font-semibold mb-2">{func.name}</h4>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{func.description}</p>
+                                  <h4 className="font-semibold mb-2">
+                                    {typeof func.name === 'string' ? func.name : 'Unnamed Function'}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                    {typeof func.description === 'string' ? func.description : 'No description available'}
+                                  </p>
                                   
                                   {func.parameters?.length > 0 && (
                                     <div className="mb-3">
@@ -1209,8 +1254,12 @@ ${example.code}
                                       <ul className="list-disc list-inside space-y-1">
                                         {func.parameters.map((param: { name: string; type: string; description: string }, paramIndex: number) => (
                                           <li key={paramIndex} className="text-sm">
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{param.name}</code>
-                                            <span className="text-gray-500"> ({param.type}): {param.description}</span>
+                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">
+                                              {typeof param.name === 'string' ? param.name : 'param'}
+                                            </code>
+                                            <span className="text-gray-500"> 
+                                              ({typeof param.type === 'string' ? param.type : 'any'}): {typeof param.description === 'string' ? param.description : 'No description'}
+                                            </span>
                                           </li>
                                         ))}
                                       </ul>
@@ -1221,15 +1270,19 @@ ${example.code}
                                     <div>
                                       <h5 className="text-sm font-semibold mb-1">Returns:</h5>
                                       <p className="text-sm">
-                                        <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{func.returns.type}</code>
-                                        <span className="text-gray-500"> - {func.returns.description}</span>
+                                        <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">
+                                          {typeof func.returns?.type === 'string' ? func.returns.type : 'void'}
+                                        </code>
+                                        <span className="text-gray-500"> - 
+                                          {typeof func.returns?.description === 'string' ? func.returns.description : 'No description'}
+                                        </span>
                                       </p>
                                     </div>
                                   )}
                                 </CardContent>
                               </Card>
                             ))}
-                            {analysis.documentation.functions.length > 5 && (
+                            {analysis.documentation.functions?.length > 5 && (
                               <p className="text-sm text-gray-500 text-center">
                                 And {analysis.documentation.functions.length - 5} more functions...
                               </p>
@@ -1242,33 +1295,35 @@ ${example.code}
                         <div>
                           <h3 className="text-lg font-semibold mb-2">Architecture Diagram</h3>
                           <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded">
-                            <pre className="text-sm">{analysis.documentation.mermaidDiagram}</pre>
-                            <p className="text-xs text-gray-500 mt-2">
-                              View at{' '}
-                              <a href="https://mermaid.live" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                                mermaid.live
-                              </a>
-                            </p>
+                            <pre className="text-sm">
+                              {typeof analysis.documentation.mermaidDiagram === 'string' 
+                                ? analysis.documentation.mermaidDiagram 
+                                : 'No diagram available'}
+                            </pre>
                           </div>
                         </div>
                       )}
 
-                      {analysis.documentation.examples.length > 0 && (
+                      {analysis.documentation.examples?.length > 0 && (
                         <div>
                           <h3 className="text-lg font-semibold mb-4">Usage Examples</h3>
                           <div className="space-y-4">
                             {analysis.documentation.examples.map((example, index) => (
                               <div key={index}>
-                                <h4 className="font-medium mb-2">{example.title}</h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{example.description}</p>
+                                <h4 className="font-medium mb-2">
+                                  {typeof example.title === 'string' ? example.title : `Example ${index + 1}`}
+                                </h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                  {typeof example.description === 'string' ? example.description : 'No description available'}
+                                </p>
                                 <SyntaxHighlighter
                                   style={oneDark}
                                   language={repository.language?.toLowerCase() || 'javascript'}
                                   PreTag="div"
                                 >
-                                  {example.code}
+                                  {typeof example.code === 'string' ? example.code : '// No code available'}
                                 </SyntaxHighlighter>
-                                {example.explanation && (
+                                {example.explanation && typeof example.explanation === 'string' && (
                                   <p className="text-sm text-gray-500 mt-2">{example.explanation}</p>
                                 )}
                               </div>
@@ -1279,15 +1334,15 @@ ${example.code}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                         <div>
-                          <h4 className="font-semibold mb-2">Components: {analysis.documentation.components.length}</h4>
+                          <h4 className="font-semibold mb-2">Components: {analysis.documentation.components?.length || 0}</h4>
                           <p className="text-sm text-gray-600">React/UI components documented</p>
                         </div>
                         <div>
-                          <h4 className="font-semibold mb-2">APIs: {analysis.documentation.apis.length}</h4>
+                          <h4 className="font-semibold mb-2">APIs: {analysis.documentation.apis?.length || 0}</h4>
                           <p className="text-sm text-gray-600">API endpoints documented</p>
                         </div>
                         <div>
-                          <h4 className="font-semibold mb-2">Data Models: {analysis.documentation.dataModels.length}</h4>
+                          <h4 className="font-semibold mb-2">Data Models: {analysis.documentation.dataModels?.length || 0}</h4>
                           <p className="text-sm text-gray-600">Data structures documented</p>
                         </div>
                         <div>
@@ -1324,35 +1379,43 @@ ${example.code}
                   <CardHeader>
                     <CardTitle>Generated Test Cases</CardTitle>
                     <CardDescription>
-                      Generated using {analysis.testCases.framework} - Estimated Coverage: {analysis.testCases.coverage}%
+                      Generated using {typeof analysis.testCases.framework === 'string' 
+                        ? analysis.testCases.framework 
+                        : 'Unknown framework'} - Estimated Coverage: {typeof analysis.testCases.coverage === 'number' 
+                        ? analysis.testCases.coverage 
+                        : 0}%
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="mb-4">
-                      <Progress value={analysis.testCases.coverage} />
+                      <Progress value={typeof analysis.testCases.coverage === 'number' ? analysis.testCases.coverage : 0} />
                     </div>
                     <div className="space-y-4">
-                      {analysis.testCases.testCases.map((testCase, index) => (
+                      {analysis.testCases.testCases?.map((testCase, index) => (
                         <Card key={index}>
                           <CardContent className="pt-4">
                             <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-semibold">{testCase.name}</h4>
+                              <h4 className="font-semibold">
+                                {typeof testCase.name === 'string' ? testCase.name : 'Unnamed Test'}
+                              </h4>
                               <div className="flex space-x-2">
                                 <Badge variant={testCase.type === 'unit' ? 'default' : testCase.type === 'integration' ? 'secondary' : 'outline'}>
-                                  {testCase.type}
+                                  {typeof testCase.type === 'string' ? testCase.type : 'unknown'}
                                 </Badge>
                                 <Badge variant={testCase.priority === 'high' ? 'destructive' : testCase.priority === 'medium' ? 'default' : 'secondary'}>
-                                  {testCase.priority}
+                                  {typeof testCase.priority === 'string' ? testCase.priority : 'medium'}
                                 </Badge>
                               </div>
                             </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{testCase.description}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                              {typeof testCase.description === 'string' ? testCase.description : 'No description available'}
+                            </p>
                             <SyntaxHighlighter
                               style={oneDark}
                               language={repository.language?.toLowerCase() || 'javascript'}
                               PreTag="div"
                             >
-                              {testCase.code}
+                              {typeof testCase.code === 'string' ? testCase.code : '// No code available'}
                             </SyntaxHighlighter>
                           </CardContent>
                         </Card>
