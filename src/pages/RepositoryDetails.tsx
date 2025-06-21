@@ -34,9 +34,14 @@ import { useAuth } from '@/context/AuthContext'
 import { GitHubService } from '@/lib/github'
 import { StructureAnalyzer } from '@/lib/structure'
 import { AIAnalyzer } from '@/lib/aiService'
+import { saveAnalysis, getAnalysis } from '@/lib/analysesService'
+import { isFavorite as checkIsFavorite, addFavorite, removeFavorite } from '@/lib/favoritesService'
+import type { ComprehensiveDocumentation } from '@/types/codeparser.interface'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { FavoriteButton } from '@/components/FavoriteButton'
+import { toast } from 'sonner'
 
 interface RepositoryData {
   id: number
@@ -70,17 +75,16 @@ interface AnalysisResults {
     recommendations: string[]
     maintainabilityIndex: number
   }
-  documentation?: {
-    summary: string
-    functions: any[]
-    examples: string[]
-  }
+  documentation?: ComprehensiveDocumentation
   testCases?: {
     testCases: any[]
     coverage: number
     framework: string
   }
 }
+
+// Remove unused `GitHubFile` and `repositoryName`
+// Removed the `GitHubFile` interface and `repositoryName` variable as they are not used.
 
 export default function RepositoryDetailsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -89,7 +93,17 @@ export default function RepositoryDetailsPage() {
   
   const [repository, setRepository] = useState<RepositoryData | null>(null)
   const [readme, setReadme] = useState<string>('')
-  const [commits, setCommits] = useState<any[]>([])
+  const [commits, setCommits] = useState<Array<{
+    sha: string;
+    commit: {
+      message: string;
+      author: {
+        name: string;
+        date: string;
+      };
+    };
+    html_url: string;
+  }>>([])
   const [analysis, setAnalysis] = useState<AnalysisResults>({})
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
@@ -97,62 +111,86 @@ export default function RepositoryDetailsPage() {
   const [generatingTests, setGeneratingTests] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
+  const [isFavorite, setIsFavorite] = useState(false)
 
+  // Check if project is favorite and load stored analysis
   useEffect(() => {
-    if (owner && repo && user) {
-      fetchRepositoryData()
+    if (owner && repo && user && repository) {
+      const projectId = `${owner}/${repo}`;
+      
+      // Check if project is favorite using repository.id
+      checkIsFavorite(user.id, repository.id.toString())
+        .then(setIsFavorite)
+        .catch(console.error);
+      
+      // Load stored analysis if available
+      getAnalysis(user.id, projectId)
+        .then(({ analysis }) => {
+          if (analysis.structure) {
+            setAnalysis(prev => ({ ...prev, structure: JSON.parse(analysis.structure) }));
+          }
+          if (analysis.codeAnalysis) {
+            setAnalysis(prev => ({ ...prev, codeAnalysis: JSON.parse(analysis.codeAnalysis) }));
+          }
+          if (analysis.documentation) {
+            setAnalysis(prev => ({ ...prev, documentation: JSON.parse(analysis.documentation) }));
+          }
+          if (analysis.testCases) {
+            setAnalysis(prev => ({ ...prev, testCases: JSON.parse(analysis.testCases) }));
+          }
+        })
+        .catch(() => {
+          // No stored analysis found, that's ok
+        });
     }
-  }, [owner, repo, user])
+  }, [owner, repo, user, repository]);
 
-  const fetchRepositoryData = async () => {
-    if (!owner || !repo) return
-    
-    setLoading(true)
-    setError(null)
+  // Fetch repository data
+  useEffect(() => {
+    const fetchRepositoryData = async () => {
+      if (!owner || !repo) return;
 
-    try {
-      // Get GitHub token
-      const tokenResponse = await fetch('http://localhost:4000/api/github-token', {
-        credentials: 'include',
-      })
-      
-      if (!tokenResponse.ok) {
-        throw new Error('Failed to get GitHub access token')
-      }
-      
-      const tokenData = await tokenResponse.json()
-      if (!tokenData.success) {
-        throw new Error('GitHub token not found')
-      }
+      setLoading(true);
+      setError(null);
 
-      const githubService = new GitHubService(tokenData.access_token)
-
-      // Fetch repository details
-      const repoData = await githubService.fetch(`repos/${owner}/${repo}`)
-      setRepository(repoData as any)
-
-      // Fetch README using the dedicated method
       try {
-        const readmeContent = await githubService.getReadme(owner, repo)
-        setReadme(readmeContent)
-        console.log('README fetched successfully')
+        const tokenResponse = await fetch('http://localhost:4000/api/github-token', {
+          credentials: 'include',
+        });
+
+        const tokenData = await tokenResponse.json();
+        const githubService = new GitHubService(tokenData.access_token);
+
+        const repoData = await githubService.fetch(`repos/${owner}/${repo}`);
+        setRepository(repoData);
+
+        const readmeContent = await githubService.getReadme(owner, repo);
+        setReadme(readmeContent);
+
+        const commitsData = await githubService.fetch(`repos/${owner}/${repo}/commits`);
+        setCommits(
+          commitsData.map((commit: any) => ({
+            sha: commit.sha,
+            commit: {
+              message: commit.commit.message,
+              author: {
+                name: commit.commit.author?.name || 'Unknown',
+                date: commit.commit.author?.date || 'Unknown',
+              },
+            },
+            html_url: commit.html_url,
+          }))
+        );
       } catch (error) {
-        console.log('No README file found in repository')
-        setReadme('')
+        console.error('Error fetching repository data:', error);
+        setError('Failed to fetch repository data');
+      } finally {
+        setLoading(false);
       }
+    };
 
-      // Fetch recent commits
-      const commitsData = await githubService.fetch(`repos/${owner}/${repo}/commits`)
-      setCommits(commitsData)
-
-    } catch (error) {
-      console.error('Error fetching repository data:', error)
-      setError(error instanceof Error ? error.message : 'Failed to fetch repository data')
-    } finally {
-      setLoading(false
-      )
-    }
-  }
+    fetchRepositoryData();
+  }, [owner, repo, user]);
 
   const runAnalysis = async () => {
     if (!owner || !repo || !user) return
@@ -182,6 +220,9 @@ export default function RepositoryDetailsPage() {
         codeAnalysis
       })
 
+      // Note: Analysis is now complete but not stored yet
+      console.log('Analysis completed successfully - ready to store')
+
     } catch (error) {
       console.error('Analysis failed:', error)
       setError('Analysis failed. Please try again.')
@@ -190,290 +231,123 @@ export default function RepositoryDetailsPage() {
     }
   }
 
-  const generateDocumentation = async () => {
-    if (!owner || !repo || !user) return
+  const storeAnalysis = async () => {
+    if (!owner || !repo || !user || !analysis) {
+      console.error('Missing data for storing analysis')
+      toast.error('Missing data for storing analysis')
+      return
+    }
 
-    setGeneratingDocs(true)
     try {
-      const tokenResponse = await fetch('http://localhost:4000/api/github-token', {
-        credentials: 'include',
-      })
+      const projectId = `${owner}/${repo}`;
+      await saveAnalysis(user.id, {
+        projectId,
+        projectName: repository?.name || `${owner}/${repo}`,
+        structure: JSON.stringify(analysis.structure),
+        codeAnalysis:  analysis.codeAnalysis?JSON.stringify(analysis.codeAnalysis):null,
+        documentation: analysis.documentation ? JSON.stringify(analysis.documentation) : null,
+        testCases: analysis.testCases ? JSON.stringify(analysis.testCases) : null,
+      });
       
-      const tokenData = await tokenResponse.json()
-      const githubService = new GitHubService(tokenData.access_token)
-      const aiAnalyzer = new AIAnalyzer()
-
-      // Get main files for documentation
-      const files = await githubService.getRepositoryStructure(owner, repo)
-      console.log('All files for documentation:', files.length)
-      console.log('Sample files:', files.slice(0, 5).map(f => ({ path: f.path, type: f.type })))
+      console.log('Analysis stored successfully!')
+      toast.success('Analysis stored successfully!')
       
-      // First try to find main/important files using the helper function
-      let mainFiles = files.filter(file => 
-        (file.type === 'blob' || file.type === 'file') && 
-        file.path &&
-        isCodeFile(file.path) &&
-        !file.path.toLowerCase().includes('.css') &&
-        !file.path.toLowerCase().includes('.scss') &&
-        !file.path.toLowerCase().includes('style') &&
-        (file.path.includes('index') || file.path.includes('main') || file.path.includes('app'))
-      )
-      
-      console.log('Main files found:', mainFiles.length, mainFiles.map(f => f.path))
-
-      // If no main files found, get any code files from the root or src directory (excluding styles)
-      if (mainFiles.length === 0) {
-        mainFiles = files.filter(file => 
-          (file.type === 'blob' || file.type === 'file') && 
-          file.path &&
-          isCodeFile(file.path) &&
-          !file.path.toLowerCase().includes('.css') &&
-          !file.path.toLowerCase().includes('.scss') &&
-          !file.path.toLowerCase().includes('style') &&
-          (file.path.startsWith('src/') || !file.path.includes('/') || file.path.startsWith('lib/'))
-        )
-      }
-      
-      console.log('Filtered files found:', mainFiles.length, mainFiles.map(f => f.path))
-
-      // If still no files, try any code file but exclude styling files
-      if (mainFiles.length === 0) {
-        mainFiles = files.filter(file => 
-          (file.type === 'blob' || file.type === 'file') && 
-          file.path &&
-          isCodeFile(file.path) &&
-          !file.path.toLowerCase().includes('.css') &&
-          !file.path.toLowerCase().includes('.scss') &&
-          !file.path.toLowerCase().includes('style')
-        )
-      }
-
-      // Prioritize and limit files to top 8 for documentation
-      mainFiles = prioritizeCodeFiles(mainFiles).slice(0, 8);
-
-      // Use more files for comprehensive analysis - up to 10 files
-      console.log('Selected files for comprehensive documentation:', mainFiles.map(f => f.path))
-
-      let documentation: {
-        summary: string;
-        functions: any[];
-        examples: string[];
-      } = {
-        summary: 'Generated documentation',
-        functions: [],
-        examples: []
-      }
-
-      if (mainFiles.length > 0) {
-        try {
-          // Fetch content for all selected files
-          const filesWithContent = []
-          
-          for (const file of mainFiles) {
-            if (file.path) {
-              try {
-                const fileContent = await githubService.getFileContent(owner, repo, file.path)
-                if (fileContent && fileContent.trim().length > 10) {
-                  filesWithContent.push({
-                    path: file.path,
-                    content: fileContent
-                  })
-                  console.log(`Added file for documentation: ${file.path}, content length: ${fileContent.length}`)
-                } else {
-                  console.log(`Skipped empty file: ${file.path}`)
-                }
-              } catch (error) {
-                console.warn(`Failed to get content for ${file.path}:`, error)
-              }
-            }
-          }
-
-          const language = repository?.language?.toLowerCase() || 'javascript'
-          const repositoryName = repository?.name || 'Unknown Repository'
-          
-          console.log(`Generating comprehensive documentation for ${filesWithContent.length} files`)
-          
-          if (filesWithContent.length > 0) {
-            // Use the new comprehensive documentation method
-            documentation = await aiAnalyzer.generateComprehensiveDocumentation(
-              filesWithContent, 
-              language, 
-              repositoryName
-            )
-          } else {
-            throw new Error('No valid file content found')
-          }
-        } catch (error) {
-          console.warn('Failed to generate comprehensive documentation:', error)
-          // Use fallback with single file method
-          const language = repository?.language?.toLowerCase() || 'javascript'
-          if (mainFiles.length > 0 && mainFiles[0].path) {
-            try {
-              const fileContent = await githubService.getFileContent(owner, repo, mainFiles[0].path)
-              documentation = await aiAnalyzer.generateCodeDocumentation(fileContent, mainFiles[0].path, language)
-            } catch (fallbackError) {
-              documentation = await aiAnalyzer.generateCodeDocumentation('', mainFiles[0].path || 'README.md', language)
-            }
-          } else {
-            documentation = await aiAnalyzer.generateCodeDocumentation('', 'README.md', language)
-          }
-        }
-      } else {
-        console.log('No suitable files found for documentation, using fallback')
-        // Fallback: use the repository language to generate basic documentation
-        const language = repository?.language?.toLowerCase() || 'javascript'
-        documentation = await aiAnalyzer.generateCodeDocumentation('', 'README.md', language)
-      }
-
-      setAnalysis(prev => ({
-        ...prev,
-        documentation
-      }))
-
     } catch (error) {
-      console.error('Documentation generation failed:', error)
-      setError('Documentation generation failed. Please try again.')
-    } finally {
-      setGeneratingDocs(false)
+      console.error('Failed to store analysis:', error)
+      toast.error('Failed to store analysis. Please try again.')
+      setError('Failed to store analysis. Please try again.')
     }
   }
 
-  const generateTestCases = async () => {
-    if (!owner || !repo || !user) return
+  const generateDocumentation = async () => {
+    if (!owner || !repo || !user) return;
 
-    setGeneratingTests(true)
+    setGeneratingDocs(true);
     try {
       const tokenResponse = await fetch('http://localhost:4000/api/github-token', {
         credentials: 'include',
-      })
-      
-      const tokenData = await tokenResponse.json()
-      const githubService = new GitHubService(tokenData.access_token)
-      const aiAnalyzer = new AIAnalyzer()
-
-      // Get main files for test generation
-      const files = await githubService.getRepositoryStructure(owner, repo)
-      console.log('All files for test generation:', files.length)
-      console.log('Sample files:', files.slice(0, 5).map(f => ({ path: f.path, type: f.type })))
-      
-      // Look for actual code files (not test files) with functions and APIs
-      let codeFiles = files.filter(file => 
-        (file.type === 'blob' || file.type === 'file') && 
-        file.path &&
-        isCodeFile(file.path) &&
-        !file.path.includes('test') && 
-        !file.path.includes('spec') &&
-        !file.path.includes('__tests__') &&
-        !file.path.includes('.test.') &&
-        !file.path.includes('.spec.') &&
-        // Focus on files likely to contain business logic
-        (file.path.toLowerCase().includes('service') || 
-         file.path.toLowerCase().includes('api') ||
-         file.path.toLowerCase().includes('util') || 
-         file.path.toLowerCase().includes('helper') ||
-         file.path.toLowerCase().includes('lib/') || 
-         file.path.toLowerCase().includes('controller') ||
-         file.path.toLowerCase().includes('route') ||
-         file.path.toLowerCase().includes('handler') ||
-         (!file.path.toLowerCase().includes('component') && !file.path.toLowerCase().includes('ui/')))
-      )
-
-      console.log('Code files found (before priority filter):', codeFiles.length, codeFiles.map(f => f.path))
-
-      // Prioritize files from src/, lib/, or root directory
-      const priorityFiles = codeFiles.filter(file => 
-        file.path?.startsWith('src/') || file.path?.startsWith('lib/') || !file.path?.includes('/')
-      )
-      
-      if (priorityFiles.length > 0) {
-        codeFiles = priorityFiles
-      }
-
-      // Use prioritization helper and limit files to top 6 for tests
-      codeFiles = prioritizeCodeFiles(codeFiles).slice(0, 6);
-      console.log('Selected files for comprehensive test generation:', codeFiles.map(f => f.path))
-
-      let testCases: {
-        testCases: any[];
-        coverage: number;
-        framework: string;
-      } = {
-        testCases: [],
-        coverage: 0,
-        framework: 'Jest'
-      }
-
-      if (codeFiles.length > 0) {
-        try {
-          // Fetch content for all selected files
-          const filesWithContent = []
-          
-          for (const file of codeFiles) {
-            if (file.path) {
-              try {
-                const fileContent = await githubService.getFileContent(owner, repo, file.path)
-                if (fileContent && fileContent.trim().length > 10) {
-                  filesWithContent.push({
-                    path: file.path,
-                    content: fileContent
-                  })
-                  console.log(`Added file for test generation: ${file.path}, content length: ${fileContent.length}`)
-                } else {
-                  console.log(`Skipped empty file: ${file.path}`)
-                }
-              } catch (error) {
-                console.warn(`Failed to get content for ${file.path}:`, error)
-              }
-            }
-          }
-
-          const language = repository?.language?.toLowerCase() || 'javascript'
-          const repositoryName = repository?.name || 'Unknown Repository'
-          
-          console.log(`Generating comprehensive test cases for ${filesWithContent.length} files`)
-          
-          if (filesWithContent.length > 0) {
-            // Use the new comprehensive test generation method
-            testCases = await aiAnalyzer.generateComprehensiveTestCases(
-              filesWithContent, 
-              language, 
-              repositoryName
-            )
-          } else {
-            throw new Error('No valid file content found')
-          }
-        } catch (error) {
-          console.warn('Failed to generate comprehensive test cases:', error)
-          // Use fallback with single file method
-          const language = repository?.language?.toLowerCase() || 'javascript'
-          if (codeFiles.length > 0 && codeFiles[0].path) {
-            try {
-              const fileContent = await githubService.getFileContent(owner, repo, codeFiles[0].path)
-              testCases = await aiAnalyzer.generateTestCases(fileContent, codeFiles[0].path, language)
-            } catch {
-              testCases = await aiAnalyzer.generateTestCases('', codeFiles[0].path || 'main.js', language)
-            }
-          } else {
-            testCases = await aiAnalyzer.generateTestCases('', 'main.js', language)
-          }
-        }
-      } else {
-        console.log('No suitable files found for test generation, using fallback')
-        // Fallback: generate basic test cases based on repository language
-        const language = repository?.language?.toLowerCase() || 'javascript'
-        testCases = await aiAnalyzer.generateTestCases('', 'main.js', language)
-      }
-
-      setAnalysis(prev => ({
+      });
+      const tokenData = await tokenResponse.json();
+      const aiAnalyzer = new AIAnalyzer();
+      // Use already-analyzed structure if available
+      const structure = analysis.structure || (await new StructureAnalyzer(tokenData.access_token).analyzeRepository(owner, repo));
+      const language = repository?.language?.toLowerCase() || 'javascript';
+      const documentation = await aiAnalyzer.generateComprehensiveDocumentation(
+        structure,
+        language,
+        repository?.name || 'Repository'
+      );
+      setAnalysis((prev) => ({
         ...prev,
-        testCases
-      }))
-
+        documentation,
+      }));
+      
+      // Save documentation to backend
+      if (owner && repo && user) {
+        const projectId = `${owner}/${repo}`;
+        await saveAnalysis(user.id, {
+          projectId,
+          projectName: repository?.name || `${owner}/${repo}`,
+          documentation: JSON.stringify(documentation),
+        });
+      }
     } catch (error) {
-      console.error('Test generation failed:', error)
-      setError('Test generation failed. Please try again.')
+      console.error('Documentation generation failed:', error);
+      setError('Documentation generation failed. Please try again.');
     } finally {
-      setGeneratingTests(false)
+      setGeneratingDocs(false);
+    }
+  };
+
+  // Update the component to use user-specific storage in the generateTestCases function
+  const generateTestCases = async () => {
+    if (!owner || !repo || !user) return;
+
+    setGeneratingTests(true);
+    try {
+      const tokenResponse = await fetch('http://localhost:4000/api/github-token', {
+        credentials: 'include',
+      });
+
+      const tokenData = await tokenResponse.json();
+      const aiAnalyzer = new AIAnalyzer();
+      
+      // Use already-analyzed structure if available
+      const structure = analysis.structure || (await new StructureAnalyzer(tokenData.access_token).analyzeRepository(owner, repo));
+      const language = repository?.language?.toLowerCase() || 'javascript';
+
+      // Use the new structure-based test generation method
+      const testResult = await aiAnalyzer.generateTestCasesFromStructure(
+        structure,
+        language,
+        repository?.name || 'Repository'
+      );
+
+      const updatedTestCases = {
+        testCases: testResult.testCases,
+        coverage: testResult.coverage,
+        framework: testResult.framework,
+      };
+
+      setAnalysis((prev) => ({
+        ...prev,
+        testCases: updatedTestCases,
+      }));
+
+      // Save test results to backend
+      if (user && owner && repo) {
+        const projectId = `${owner}/${repo}`;
+        await saveAnalysis(user.id, {
+          projectId,
+          projectName: repository?.name || `${owner}/${repo}`,
+          testCases: JSON.stringify(updatedTestCases),
+        });
+      }
+    } catch (error) {
+      console.error('Test generation failed:', error);
+      setError('Test generation failed. Please try again.');
+    } finally {
+      setGeneratingTests(false);
     }
   }
 
@@ -582,33 +456,269 @@ export default function RepositoryDetailsPage() {
     return false;
   };
 
-  // Helper function to prioritize code files for analysis
-  const prioritizeCodeFiles = (files: any[]): any[] => {
-    // Priority order: main source files > config files > documentation
-    const highPriority = files.filter(file => {
-      const path = file.path?.toLowerCase() || '';
-      return path.includes('src/') || path.includes('lib/') || 
-             path.endsWith('.ts') || path.endsWith('.js') || 
-             path.endsWith('.tsx') || path.endsWith('.jsx') ||
-             path.endsWith('.py') || path.endsWith('.java') ||
-             path.endsWith('.cpp') || path.endsWith('.c');
-    });
+  // Export documentation to Word format
+  const exportToWord = async (documentation: ComprehensiveDocumentation) => {
+    try {
+      // Create a comprehensive document structure
+      const docContent = `
+# ${repository?.name || 'Repository'} Documentation
 
-    const mediumPriority = files.filter(file => {
-      const path = file.path?.toLowerCase() || '';
-      return !highPriority.includes(file) && (
-             path.endsWith('.cs') || path.endsWith('.php') || 
-             path.endsWith('.rb') || path.endsWith('.go') ||
-             path.endsWith('.rs') || path.endsWith('.kt') ||
-             path.endsWith('.swift') || path.endsWith('.scala')
-      );
-    });
+## Project Summary
+${documentation.summary}
 
-    const lowPriority = files.filter(file => 
-      !highPriority.includes(file) && !mediumPriority.includes(file)
-    );
+## Architecture Overview
+**Pattern**: ${documentation.architecture.pattern}
+**Description**: ${documentation.architecture.description}
 
-    return [...highPriority, ...mediumPriority, ...lowPriority];
+### Technologies Used
+${documentation.architecture.technologies.map(tech => `- ${tech}`).join('\n')}
+
+### Architecture Layers
+${documentation.architecture.layers.map(layer => `
+**${layer.name}**
+${layer.description}
+Components: ${layer.components.join(', ')}
+`).join('\n')}
+
+## Folder Structure
+\`\`\`
+${documentation.folderStructure.tree}
+\`\`\`
+
+### Directory Details
+${documentation.folderStructure.directories.map(dir => `
+**${dir.path}** (${dir.type})
+Purpose: ${dir.purpose}
+Files: ${dir.fileCount}
+${dir.description}
+`).join('\n')}
+
+## Code Internals
+
+### Code Flow
+${documentation.codeInternals.codeFlow}
+
+### Data Flow
+${documentation.codeInternals.dataFlow}
+
+### Key Algorithms
+${documentation.codeInternals.keyAlgorithms.map(algo => `
+**${algo.name}** (${algo.file})
+${algo.description}
+Implementation: ${algo.implementation}
+Complexity: ${algo.complexity}
+`).join('\n')}
+
+### Design Patterns
+${documentation.codeInternals.designPatterns.map(pattern => `
+**${pattern.pattern}**
+Usage: ${pattern.usage}
+Files: ${pattern.files.join(', ')}
+${pattern.description}
+`).join('\n')}
+
+### Business Logic
+${documentation.codeInternals.businessLogic.map(logic => `
+**${logic.module}**
+Purpose: ${logic.purpose}
+Workflow: ${logic.workflow}
+Files: ${logic.files.join(', ')}
+`).join('\n')}
+
+## SDLC Documentation
+
+### Development Workflow
+${documentation.sdlc.developmentWorkflow}
+
+### Setup Instructions
+${documentation.sdlc.setupInstructions.map(step => `
+${step.step}. **${step.title}**
+   ${step.description}
+   \`\`\`bash
+   ${step.commands.join('\n   ')}
+   \`\`\`
+`).join('\n')}
+
+### Build Process
+${documentation.sdlc.buildProcess.description}
+
+**Steps:**
+${documentation.sdlc.buildProcess.steps.map(step => `- ${step}`).join('\n')}
+
+**Tools:**
+${documentation.sdlc.buildProcess.tools.map(tool => `- ${tool}`).join('\n')}
+
+### Testing Strategy
+**Approach:** ${documentation.sdlc.testingStrategy.approach}
+**Coverage:** ${documentation.sdlc.testingStrategy.coverage}
+
+**Test Types:**
+${documentation.sdlc.testingStrategy.testTypes.map(type => `- ${type}`).join('\n')}
+
+**Frameworks:**
+${documentation.sdlc.testingStrategy.frameworks.map(framework => `- ${framework}`).join('\n')}
+
+### Deployment Guide
+${documentation.sdlc.deploymentGuide.process}
+
+**Environments:** ${documentation.sdlc.deploymentGuide.environments.join(', ')}
+
+${documentation.sdlc.deploymentGuide.steps.map(envStep => `
+**${envStep.environment}:**
+${envStep.steps.map(step => `- ${step}`).join('\n')}
+`).join('\n')}
+
+### Maintenance
+**Guidelines:**
+${documentation.sdlc.maintenance.guidelines.map(guide => `- ${guide}`).join('\n')}
+
+**Monitoring:**
+${documentation.sdlc.maintenance.monitoring.map(monitor => `- ${monitor}`).join('\n')}
+
+**Troubleshooting:**
+${documentation.sdlc.maintenance.troubleshooting.map(trouble => `
+**Issue:** ${trouble.issue}
+**Solution:** ${trouble.solution}
+`).join('\n')}
+
+## System Architecture Diagram (Mermaid)
+\`\`\`mermaid
+${documentation.mermaidDiagram}
+\`\`\`
+
+## Components (${documentation.components.length})
+${documentation.components.map(component => `
+### ${component.name} (${component.type})
+**File**: ${component.file}
+**Description**: ${component.description}
+
+**Internals:**
+- Purpose: ${component.internals.purpose}
+- Key Methods: ${component.internals.keyMethods.join(', ')}
+- State Management: ${component.internals.stateManagement}
+- Lifecycle: ${component.internals.lifecycle}
+
+**Dependencies**: ${component.dependencies.join(', ')}
+**Exports**: ${component.exports.join(', ')}
+`).join('\n')}
+
+## API Endpoints (${documentation.apis.length})
+${documentation.apis.map(api => `
+### ${api.method} ${api.endpoint}
+**Description**: ${api.description}
+
+**Parameters**:
+${api.parameters.map(param => `- **${param.name}** (${param.type}): ${param.description}`).join('\n')}
+
+**Response**: ${api.response}
+
+**Implementation Details:**
+- Implementation: ${api.internals.implementation}
+- Validation: ${api.internals.validation}
+- Error Handling: ${api.internals.errorHandling}
+- Authentication: ${api.internals.authentication}
+`).join('\n')}
+
+## Functions & Methods (${documentation.functions.length})
+${documentation.functions.map(func => `
+### ${func.name} (${func.type})
+**File**: ${func.file}
+**Description**: ${func.description}
+
+**Parameters**:
+${func.parameters.map(param => `- **${param.name}** (${param.type}): ${param.description}`).join('\n')}
+
+**Returns**: ${func.returns.type} - ${func.returns.description}
+
+**Internal Details:**
+- Algorithm: ${func.internals.algorithm}
+- Complexity: ${func.internals.complexity}
+- Side Effects: ${func.internals.sideEffects}
+- Dependencies: ${func.internals.dependencies.join(', ')}
+`).join('\n')}
+
+## Data Models & Interfaces (${documentation.dataModels.length})
+${documentation.dataModels.map(model => `
+### ${model.name} (${model.type})
+**File**: ${model.file}
+
+**Properties**:
+${model.properties.map(prop => `- **${prop.name}** (${prop.type}): ${prop.description}`).join('\n')}
+
+**Relationships**:
+${model.relationships.map(rel => `- ${rel.model} (${rel.type}): ${rel.description}`).join('\n')}
+
+**Validation**:
+${model.validation.map(rule => `- ${rule}`).join('\n')}
+`).join('\n')}
+
+## Usage Examples
+${documentation.examples.map(example => `
+### ${example.title}
+${example.description}
+
+\`\`\`${repository?.language?.toLowerCase() || 'javascript'}
+${example.code}
+\`\`\`
+
+**Explanation:** ${example.explanation}
+`).join('\n')}
+
+---
+*Generated on ${new Date().toLocaleDateString()} for ${repository?.full_name || 'Repository'}*
+      `;
+
+      // Create a Blob with the content
+      const blob = new Blob([docContent], { type: 'text/markdown' });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${repository?.name || 'repository'}-documentation.md`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      
+      // Show success message (you could add a toast notification here)
+      console.log('Documentation exported successfully!');
+      
+    } catch (error) {
+      console.error('Failed to export documentation:', error);
+      // Show error message (you could add a toast notification here)
+    }
+  };
+
+  // Toggle favorite status
+  const toggleFavorite = async () => {
+    if (owner && repo && user && repository) {
+      try {
+        if (isFavorite) {
+          // Use the same repoId format as when adding
+          await removeFavorite(user.id, repository.id.toString());
+          setIsFavorite(false);
+          toast.success('Removed from Favorites', {
+            description: `${repository.name} has been removed from your favorites.`,
+          });
+        } else {
+          await addFavorite(user.id, repository);
+          setIsFavorite(true);
+          toast.success('Added to Favorites', {
+            description: `${repository.name} has been added to your favorites.`,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to toggle favorite:', error);
+        toast.error('Error', {
+          description: 'Failed to update favorites. Please try again.',
+        });
+      }
+    }
   };
 
   if (loading) {
@@ -680,6 +790,14 @@ export default function RepositoryDetailsPage() {
             <div className="flex space-x-2">
               <Button 
                 variant="outline"
+                onClick={toggleFavorite}
+                className={isFavorite ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : ''}
+              >
+                <Star className={`w-4 h-4 mr-2 ${isFavorite ? 'fill-current' : ''}`} />
+                {isFavorite ? 'Favorited' : 'Add to Favorites'}
+              </Button>
+              <Button 
+                variant="outline"
                 onClick={() => window.open(repository.html_url, '_blank')}
               >
                 <Github className="w-4 h-4 mr-2" />
@@ -707,6 +825,16 @@ export default function RepositoryDetailsPage() {
                 </>
               )}
             </Button>
+            {analysis && (
+              <Button 
+                onClick={storeAnalysis} 
+                variant="outline"
+                className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Store Analysis
+              </Button>
+            )}
             <Button 
               onClick={generateDocumentation} 
               disabled={generatingDocs}
@@ -826,7 +954,7 @@ export default function RepositoryDetailsPage() {
                       <p className="text-sm text-gray-600 dark:text-gray-400">Test Coverage</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-orange-600">{analysis.structure.complexity.average}</p>
+                      <p className="text-2xl font-bold text-orange-600">{analysis.structure.complexity.average.toFixed(2)}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Avg Complexity</p>
                     </div>
                   </div>
@@ -851,19 +979,19 @@ export default function RepositoryDetailsPage() {
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown
                       components={{
-                        code({ node, inline, className, children, ...props }) {
+                        code({ className, children }: { className?: string; children?: React.ReactNode }) {
                           const match = /language-(\w+)/.exec(className || '')
+                          const inline = !match
                           return !inline && match ? (
                             <SyntaxHighlighter
                               style={oneDark}
                               language={match[1]}
                               PreTag="div"
-                              {...props}
                             >
                               {String(children).replace(/\n$/, '')}
                             </SyntaxHighlighter>
                           ) : (
-                            <code className={className} {...props}>
+                            <code className={className}>
                               {children}
                             </code>
                           )
@@ -955,6 +1083,16 @@ export default function RepositoryDetailsPage() {
                     <Button onClick={runAnalysis} disabled={analyzing}>
                       {analyzing ? 'Analyzing...' : 'Run Analysis'}
                     </Button>
+                    {analysis && (
+                      <Button 
+                        onClick={storeAnalysis} 
+                        variant="outline"
+                        className="bg-green-600 hover:bg-green-700 text-white border-green-600 ml-2"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Store Analysis
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -966,20 +1104,100 @@ export default function RepositoryDetailsPage() {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Project Documentation</CardTitle>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Enhanced Documentation</span>
+                      <Button 
+                        onClick={() => exportToWord(analysis.documentation!)} 
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export
+                      </Button>
+                    </CardTitle>
+                    <CardDescription>
+                      Comprehensive documentation with code internals, SDLC guide, and architecture
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-6">
                       <div>
-                        <h3 className="text-lg font-semibold mb-2">Summary</h3>
+                        <h3 className="text-lg font-semibold mb-2">Project Summary</h3>
                         <p className="text-gray-600 dark:text-gray-400">{analysis.documentation.summary}</p>
                       </div>
 
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Architecture Overview</h3>
+                        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                          <p className="font-medium">Pattern: {analysis.documentation.architecture.pattern}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{analysis.documentation.architecture.description}</p>
+                          <div className="mt-2">
+                            <span className="text-sm font-medium">Technologies: </span>
+                            {analysis.documentation.architecture.technologies.map((tech, index) => (
+                              <Badge key={index} variant="secondary" className="mr-1">
+                                {tech}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {analysis.documentation.folderStructure?.tree && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Folder Structure</h3>
+                          <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-sm overflow-x-auto">
+                            {analysis.documentation.folderStructure.tree}
+                          </pre>
+                        </div>
+                      )}
+
+                      {analysis.documentation.codeInternals && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Code Internals</h3>
+                          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                            <div>
+                              <span className="font-medium">Code Flow: </span>
+                              <span className="text-sm">{analysis.documentation.codeInternals.codeFlow}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium">Data Flow: </span>
+                              <span className="text-sm">{analysis.documentation.codeInternals.dataFlow}</span>
+                            </div>
+                            {analysis.documentation.codeInternals.keyAlgorithms.length > 0 && (
+                              <div>
+                                <span className="font-medium">Key Algorithms: </span>
+                                <span className="text-sm">{analysis.documentation.codeInternals.keyAlgorithms.length} documented</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {analysis.documentation.sdlc && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">SDLC Documentation</h3>
+                          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                            <div>
+                              <span className="font-medium">Development Workflow: </span>
+                              <span className="text-sm">{analysis.documentation.sdlc.developmentWorkflow}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium">Setup Instructions: </span>
+                              <span className="text-sm">{analysis.documentation.sdlc.setupInstructions.length} steps documented</span>
+                            </div>
+                            <div>
+                              <span className="font-medium">Testing Strategy: </span>
+                              <span className="text-sm">{analysis.documentation.sdlc.testingStrategy.approach}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {analysis.documentation.functions.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold mb-4">Functions</h3>
-                          <div className="space-y-4">
-                            {analysis.documentation.functions.map((func, index) => (
+                          <h3 className="text-lg font-semibold mb-4">Functions ({analysis.documentation.functions.length})</h3>
+                          <div className="space-y-4 max-h-96 overflow-y-auto">
+                            {analysis.documentation.functions.slice(0, 5).map((func, index) => (
                               <Card key={index}>
                                 <CardContent className="pt-4">
                                   <h4 className="font-semibold mb-2">{func.name}</h4>
@@ -989,7 +1207,7 @@ export default function RepositoryDetailsPage() {
                                     <div className="mb-3">
                                       <h5 className="text-sm font-semibold mb-2">Parameters:</h5>
                                       <ul className="list-disc list-inside space-y-1">
-                                        {func.parameters.map((param: any, paramIndex: number) => (
+                                        {func.parameters.map((param: { name: string; type: string; description: string }, paramIndex: number) => (
                                           <li key={paramIndex} className="text-sm">
                                             <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{param.name}</code>
                                             <span className="text-gray-500"> ({param.type}): {param.description}</span>
@@ -1011,6 +1229,26 @@ export default function RepositoryDetailsPage() {
                                 </CardContent>
                               </Card>
                             ))}
+                            {analysis.documentation.functions.length > 5 && (
+                              <p className="text-sm text-gray-500 text-center">
+                                And {analysis.documentation.functions.length - 5} more functions...
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {analysis.documentation.mermaidDiagram && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Architecture Diagram</h3>
+                          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded">
+                            <pre className="text-sm">{analysis.documentation.mermaidDiagram}</pre>
+                            <p className="text-xs text-gray-500 mt-2">
+                              View at{' '}
+                              <a href="https://mermaid.live" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                                mermaid.live
+                              </a>
+                            </p>
                           </div>
                         </div>
                       )}
@@ -1021,18 +1259,42 @@ export default function RepositoryDetailsPage() {
                           <div className="space-y-4">
                             {analysis.documentation.examples.map((example, index) => (
                               <div key={index}>
+                                <h4 className="font-medium mb-2">{example.title}</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{example.description}</p>
                                 <SyntaxHighlighter
                                   style={oneDark}
                                   language={repository.language?.toLowerCase() || 'javascript'}
                                   PreTag="div"
                                 >
-                                  {example}
+                                  {example.code}
                                 </SyntaxHighlighter>
+                                {example.explanation && (
+                                  <p className="text-sm text-gray-500 mt-2">{example.explanation}</p>
+                                )}
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                        <div>
+                          <h4 className="font-semibold mb-2">Components: {analysis.documentation.components.length}</h4>
+                          <p className="text-sm text-gray-600">React/UI components documented</p>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-2">APIs: {analysis.documentation.apis.length}</h4>
+                          <p className="text-sm text-gray-600">API endpoints documented</p>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-2">Data Models: {analysis.documentation.dataModels.length}</h4>
+                          <p className="text-sm text-gray-600">Data structures documented</p>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-2">SDLC Guide</h4>
+                          <p className="text-sm text-gray-600">Complete development lifecycle</p>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1042,12 +1304,12 @@ export default function RepositoryDetailsPage() {
                 <CardContent className="pt-6">
                   <div className="text-center py-8">
                     <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Documentation Generated</h3>
+                    <h3 className="text-lg font-semibold mb-2">Enhanced Documentation Ready</h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Generate AI-powered documentation for this repository
+                      Generate comprehensive documentation with code internals, SDLC guide, and folder structure
                     </p>
                     <Button onClick={generateDocumentation} disabled={generatingDocs}>
-                      {generatingDocs ? 'Generating...' : 'Generate Documentation'}
+                      {generatingDocs ? 'Generating...' : 'Generate Enhanced Documentation'}
                     </Button>
                   </div>
                 </CardContent>
@@ -1120,7 +1382,10 @@ export default function RepositoryDetailsPage() {
           <TabsContent value="commits">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Commits</CardTitle>
+                <CardTitle>Recent Git History</CardTitle>
+                <CardDescription>
+                  Latest commits and changes to this repository
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -1141,10 +1406,25 @@ export default function RepositoryDetailsPage() {
                             {formatDate(commit.commit.author.date)}
                           </span>
                           <span className="font-mono">{commit.sha.substring(0, 7)}</span>
+                          <a 
+                            href={commit.html_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:underline"
+                          >
+                            View on GitHub
+                          </a>
                         </div>
                       </div>
                     </div>
                   ))}
+                  {commits.length === 0 && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <GitCommit className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg mb-2">No commits found</p>
+                      <p className="text-sm">Unable to fetch commit history for this repository.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

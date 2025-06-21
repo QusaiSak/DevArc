@@ -5,6 +5,7 @@ const cors = require('cors');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const { createOrUpdateUser } = require('./db/users');
 
 const app = express();
 const PORT = process.env.PORT;
@@ -19,8 +20,13 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increase payload limit for large analysis data
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
+
+// API Routes
+app.use('/api/favorites', require('./api/favorites'));
+app.use('/api/analyses', require('./api/analyses'));
 
 // Routes
 app.get('/auth/github', (req, res) => {
@@ -111,10 +117,21 @@ app.post('/auth/github/callback', async (req, res) => {
 
     console.log('User authenticated successfully:', user.login);
 
-    // Create JWT token
+    // Save/update user in database
+    const dbUser = await createOrUpdateUser({
+      id: user.id,
+      login: user.login,
+      email: primaryEmail,
+      name: user.name,
+      avatar_url: user.avatar_url,
+      access_token: access_token,
+    });
+
+    // Create JWT token with database user ID
     const token = jwt.sign(
       {
         id: user.id,
+        dbId: dbUser.id, // Database user ID
         username: user.login,
         email: primaryEmail,
         avatar_url: user.avatar_url,
@@ -135,7 +152,7 @@ app.post('/auth/github/callback', async (req, res) => {
     res.json({
       success: true,
       user: {
-        id: user.id,
+        id: dbUser.id, // Use database ID
         username: user.login,
         email: primaryEmail,
         avatar_url: user.avatar_url,
@@ -165,7 +182,7 @@ app.get('/auth/me', (req, res) => {
     res.json({
       success: true,
       user: {
-        id: decoded.id,
+        id: decoded.dbId, // Use database ID
         username: decoded.username,
         email: decoded.email,
         avatar_url: decoded.avatar_url,
@@ -181,8 +198,6 @@ app.post('/auth/logout', (req, res) => {
   res.clearCookie('auth_token');
   res.json({ success: true });
 });
-
-
 
 // Get GitHub access token for frontend use
 app.get('/api/github-token', (req, res) => {

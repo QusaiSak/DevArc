@@ -16,6 +16,8 @@ export const Navbar = () => {
         { label: 'Home', link: '/' },
         { label: 'About', link: '/about' },
         { label: 'Contact', link: '/contact' },
+        // Only show Favorites link if user is authenticated
+        ...(isAuthenticated ? [{ label: 'Favorites', link: '/search' }] : []),
     ]
 
     const toggleMobileMenu = () => {

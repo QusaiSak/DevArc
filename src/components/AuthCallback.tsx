@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
 
 export const AuthCallback = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { checkAuthStatus } = useAuth()
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -30,8 +32,11 @@ export const AuthCallback = () => {
           const data = await response.json()
 
           if (data.success) {
-            // Redirect to home page and refresh auth context
-            window.location.href = '/'
+            // Refresh auth context and then redirect
+            await checkAuthStatus()
+            setTimeout(() => {
+              window.location.href = '/'
+            }, 100)
           } else {
             console.error('Auth callback failed:', data)
             navigate('/?error=auth_failed')
@@ -44,7 +49,7 @@ export const AuthCallback = () => {
     }
 
     handleCallback()
-  }, [searchParams, navigate])
+  }, [searchParams, navigate, checkAuthStatus])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">

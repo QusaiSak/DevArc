@@ -38,3 +38,4 @@ out-tsc-prod
 .env.development.local
 .env.test.local
 .env.production.local
+drizzle/

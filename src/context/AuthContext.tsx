@@ -65,8 +65,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         credentials: 'include',
       })
       setUser(null)
+      // Redirect to home page after logout
+      window.location.href = '/'
     } catch (error) {
       console.error('Logout failed:', error)
+      // Even if logout request fails, clear user and redirect
+      setUser(null)
+      window.location.href = '/'
     }
   }
 
@@ -75,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     login,
     logout,
+    checkAuthStatus,
     isAuthenticated: !!user,
   }
 
