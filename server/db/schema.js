@@ -1,4 +1,4 @@
-const { pgTable, serial, text, integer, timestamp, uniqueIndex } = require('drizzle-orm/pg-core');
+const { pgTable, serial, text, integer, timestamp, uniqueIndex, json } = require('drizzle-orm/pg-core');
 
 const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -43,4 +43,18 @@ const analyses = pgTable('analyses', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-module.exports = { users, favorites, analyses };
+// Enhanced projects table
+const projects = pgTable('projects', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  sdlc: json('sdlc').notNull(), // Store SDLC as JSON for structure
+  questions: json('questions'), // Store onboarding Q&A as JSON
+  tags: text('tags'),           // Optional: comma-separated or JSON array
+  visibility: text('visibility').default('private'), // Optional: 'private' or 'public'
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+module.exports = { users, favorites, analyses, projects };

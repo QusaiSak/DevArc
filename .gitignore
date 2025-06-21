@@ -26,7 +26,6 @@ dist-ssr
 # Build directories
 build
 coverage
-lib
 out-tsc
 out-tsc-ssr
 out-tsc-ssr-prod
