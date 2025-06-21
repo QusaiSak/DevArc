@@ -27,6 +27,8 @@ app.use(cookieParser());
 // API Routes
 app.use('/api/favorites', require('./api/favorites'));
 app.use('/api/analyses', require('./api/analyses'));
+app.use('/api/projects', require('./api/project'));
+
 
 // Routes
 app.get('/auth/github', (req, res) => {

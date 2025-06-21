@@ -9,6 +9,8 @@ import RepositoryDetailsPage from "./pages/RepositoryDetails"
 import { Toaster } from "sonner"
 import { AuthProvider } from "./context/AuthContext"
 import { ProtectedRoute } from "./components/ProtectedRoute"
+import CreateProjectPage from "./pages/CreateProject"
+import ProjectViewPage from "./pages/ProjectView"
 
 function App() {
   return (
@@ -24,8 +26,12 @@ function App() {
                 <Dashboard1 />
               </ProtectedRoute>
             } />
+            <Route path="/create-project" element={<CreateProjectPage />} />
+            <Route path="/projects/:id" element={<ProjectViewPage/>} />
             <Route path="/repository/:owner/:repo" element={<RepositoryDetailsPage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+
+            <Route path="*" element={<div className="p-4">Page Not Found</div>} />
           </Routes>
           <Toaster />
         </BrowserRouter>

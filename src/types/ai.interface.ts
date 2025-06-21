@@ -12,10 +12,10 @@ export interface AiMessage {
 export interface ProjectData {
   name: string
   description: string
-  type: string
+  type: string           // <-- Add this (e.g., "Web App", "API", "Mobile App")
   teamSize: string
   timeline: string
-  complexity: string
+  complexity: string     // <-- Add this (e.g., "Low", "Medium", "High")
   requirements: string
   keyFeatures: string
   riskFactors: string
@@ -25,8 +25,10 @@ export interface ProjectData {
 export interface SDDProjectInput {
   name: string
   description: string
+  type: string           // <-- Add this
   teamSize: string
   timeline: string
+  complexity: string     // <-- Add this
   techStack: string
   keyFeatures: string
   riskFactors: string

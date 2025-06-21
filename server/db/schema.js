@@ -51,6 +51,7 @@ const projects = pgTable('projects', {
   description: text('description'),
   sdlc: json('sdlc').notNull(), // Store SDLC as JSON for structure
   questions: json('questions'), // Store onboarding Q&A as JSON
+  repoUrl: text('repo_url'),    // GitHub repository URL
   tags: text('tags'),           // Optional: comma-separated or JSON array
   visibility: text('visibility').default('private'), // Optional: 'private' or 'public'
   createdAt: timestamp('created_at').defaultNow(),

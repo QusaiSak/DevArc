@@ -35,7 +35,7 @@ export function parseAiJsonResponse(aiText: string): any {
   }
 }
 const DEFAULT_OPTIONS: AiResponseOptions = {
-  model: "mistralai/devstral-small:free",
+  model: "mistralai/devstral-small-2505:free",
   systemPrompt:
     "You are a senior software development consultant, codebase auditor, and technical architect.\n\n" +
     "Your role is to thoroughly analyze code repositories and provide high-value, context-aware insights and recommendations across six key areas:\n\n" +
@@ -150,6 +150,7 @@ export class AIAnalyzer {
    ): Promise<{
     recommended: string
     reasoning: string
+    phases: string[]
     alternatives: Array<{
       model: string
       suitability: number
@@ -203,6 +204,7 @@ Respond in **valid JSON** format with the following structure:
 {
   "recommended": "<Most suitable SDLC methodology>",
   "reasoning": "<A detailed explanation of why this model is the best fit, tied directly to project attributes>",
+  "phases": ["<List of recommended phases for this SDLC>", "<Phase 2>", "<Phase 3>"],
   "alternatives": [
     {
       "name": "<Alternative methodology name>",
@@ -211,7 +213,6 @@ Respond in **valid JSON** format with the following structure:
       "cons": ["<List of disadvantages>"],
       "additionalConsiderations": "<Optional insights, e.g., when this might still work well>"
     }
-    ...
   ]
 }
 
@@ -665,6 +666,12 @@ Treat this like a software design handover for a real engineering team. Be clear
       console.log("🔄 Parsing AI response...");
       
       const parsed = parseAiJsonResponse(response);
+
+      // --- ALWAYS use our own folder structure tree formatting ---
+      if (parsed.folderStructure) {
+        parsed.folderStructure.tree = createFolderStructureTree(files, repositoryName);
+      }
+
       console.log("✅ Documentation generated successfully!");
       console.log("📊 Generated data summary:", {
         hasArchitecture: !!parsed.architecture,
@@ -686,6 +693,8 @@ Treat this like a software design handover for a real engineering team. Be clear
     const prompt = `
 You are a professional-grade software architect and technical writer.
 
+CRITICAL: Return ONLY plain markdown content. Do not wrap in JSON, quotes, or any other format.
+
 Your task is to generate a complete, structured, GitHub-ready README document that doubles as a Software Design Document (SDD), fully aligned with IEEE 1016 Software Design Description standards. This document will serve as both technical documentation and onboarding material for developers, managers, and stakeholders.
 
 You will be provided with structured input fields as follows:
@@ -705,7 +714,19 @@ You will be provided with structured input fields as follows:
 
 ### 📄 YOUR OUTPUT FORMAT:
 
-Produce a **Markdown-formatted README** structured with the following main sections:
+Create a well-structured README.md that includes:
+1. Project title with description
+2. Features section with emojis
+3. Tech stack with badges
+4. Installation instructions
+5. Usage examples
+6. Project structure
+7. Development setup
+8. Contributing guidelines
+9. License information
+10. Contact/support information
+
+Make it professional, comprehensive, and follow modern README best practices. Use proper markdown formatting with badges, emojis, and clear sections.
 
 ---
 
@@ -779,11 +800,37 @@ Produce a **Markdown-formatted README** structured with the following main secti
 ---
 
 Generate this entire document based on the provided fields. Adapt the tone for technical clarity and completeness.
+
+DO NOT wrap the response in JSON or quotes. Return the markdown content directly starting with # ${project.name}
 `;
     try {
       const response = await generateAiResponse([{ role: "user", content: prompt }], { maxTokens: 8192 });
+      
+      console.log('🔍 AI SDD/README Response Debug:');
+      console.log('- Type:', typeof response);
+      console.log('- Length:', response.length);
+      console.log('- First 300 chars:', response.substring(0, 300));
+      console.log('- Starts with JSON?:', response.trim().startsWith('{'));
+      console.log('- Contains README.md key?:', response.includes('"README.md"'));
+      
+      // Check if the response is JSON-wrapped and extract content if needed
+      let cleanResponse = response.trim();
+      
+      if (cleanResponse.startsWith('{') && cleanResponse.includes('"README.md"')) {
+        console.log('⚠️ Detected JSON-wrapped response, extracting markdown content...');
+        try {
+          const parsed = JSON.parse(cleanResponse);
+          if (parsed["README.md"]) {
+            cleanResponse = parsed["README.md"];
+            console.log('✅ Successfully extracted markdown from JSON wrapper');
+          }
+        } catch {
+          console.log('❌ Failed to parse JSON wrapper, using original response');
+        }
+      }
+      
       // This is a Markdown document, so just return as string
-      return response.trim();
+      return cleanResponse;
     } catch (error) {
       console.error("AI SDD/README generation failed:", error);
       throw new Error("Could not generate SDD/README from AI.");
@@ -795,15 +842,20 @@ Generate this entire document based on the provided fields. Adapt the tone for t
     const teamSize = parseInt(projectData.teamSize) || 1;
     
     let recommended = "Agile";
+    let phases = ["Planning", "Development", "Testing", "Review", "Deployment"];
+    
     if (complexity.includes("high") && teamSize > 10) {
       recommended = "Scrum";
+      phases = ["Sprint Planning", "Daily Standups", "Development", "Sprint Review", "Sprint Retrospective"];
     } else if (complexity.includes("low") && teamSize < 5) {
       recommended = "Kanban";
+      phases = ["Backlog", "To Do", "In Progress", "Testing", "Done"];
     }
 
     return {
       recommended,
       reasoning: `Based on ${projectData.complexity} complexity and ${projectData.teamSize} team size, ${recommended} methodology is recommended.`,
+      phases,
       alternatives: [
         {
           model: "Waterfall",

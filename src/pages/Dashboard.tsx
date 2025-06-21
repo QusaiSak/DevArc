@@ -84,7 +84,7 @@ export default function Dashboard1() {
   const displayName = user?.username || user?.email || 'Developer';
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-white dark:bg-gray-900 min-h-screen">
+    <div className="mx-auto px-4 py-8 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-black min-h-screen">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">
           Welcome back, {displayName}!

@@ -38,6 +38,9 @@ import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { toast } from 'sonner'
+import MermaidDiagram from '@/components/MermaidDiagram'
+import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 
 interface RepositoryData {
   id: number
@@ -63,7 +66,14 @@ interface RepositoryData {
 }
 
 interface AnalysisResults {
-  structure?: any
+  structure?: {
+    totalFiles: number
+    totalLines: number
+    testCoverage: number
+    complexity: {
+      average: number
+    }
+  }
   codeAnalysis?: {
     qualityScore: number
     strengths: string[]
@@ -73,7 +83,13 @@ interface AnalysisResults {
   }
   documentation?: ComprehensiveDocumentation
   testCases?: {
-    testCases: any[]
+    testCases: {
+      name: string
+      type: string
+      priority: string
+      description: string
+      code: string
+    }[]
     coverage: number
     framework: string
   }
@@ -169,16 +185,26 @@ export default function RepositoryDetailsPage() {
         const tokenData = await tokenResponse.json();
         const githubService = new GitHubService(tokenData.access_token);
 
-        const repoData = await githubService.fetch(`repos/${owner}/${repo}`);
+        const repoData = await githubService.fetch(`repos/${owner}/${repo}`) as RepositoryData;
         setRepository(repoData);
 
         const readmeContent = await githubService.getReadme(owner, repo);
         setReadme(readmeContent);
 
-        const commitsData = await githubService.fetch(`repos/${owner}/${repo}/commits`);
+        const commitsData = await githubService.fetch(`repos/${owner}/${repo}/commits`) as Array<{
+          sha: string;
+          commit: {
+            message: string;
+            author: {
+              name: string;
+              date: string;
+            };
+          };
+          html_url: string;
+        }>;
         if (Array.isArray(commitsData)) {
           setCommits(
-            commitsData.map((commit: any) => ({
+            commitsData.map((commit) => ({
               sha: commit.sha,
               commit: {
                 message: commit.commit.message,
@@ -286,8 +312,8 @@ export default function RepositoryDetailsPage() {
       });
       const tokenData = await tokenResponse.json();
       const aiAnalyzer = new AIAnalyzer();
-      // Use already-analyzed structure if available
-      const structure = analysis.structure || (await new StructureAnalyzer(tokenData.access_token).analyzeRepository(owner, repo));
+      // Always do fresh analysis for comprehensive documentation
+      const structure = await new StructureAnalyzer(tokenData.access_token).analyzeRepository(owner, repo);
       const language = repository?.language?.toLowerCase() || 'javascript';
       const documentation = await aiAnalyzer.generateComprehensiveDocumentation(
         structure,
@@ -322,8 +348,8 @@ export default function RepositoryDetailsPage() {
       const tokenData = await tokenResponse.json();
       const aiAnalyzer = new AIAnalyzer();
       
-      // Use already-analyzed structure if available
-      const structure = analysis.structure || (await new StructureAnalyzer(tokenData.access_token).analyzeRepository(owner, repo));
+      // Always do fresh analysis for test generation
+      const structure = await new StructureAnalyzer(tokenData.access_token).analyzeRepository(owner, repo);
       const language = repository?.language?.toLowerCase() || 'javascript';
 
       // Use the new structure-based test generation method
@@ -667,7 +693,7 @@ ${example.code}
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-black">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -891,30 +917,95 @@ ${example.code}
               </CardHeader>
               <CardContent>
                 {readme ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown
-                      components={{
-                        code({ className, children }: { className?: string; children?: React.ReactNode }) {
-                          const match = /language-(\w+)/.exec(className || '')
-                          const inline = !match
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              style={oneDark}
-                              language={match[1]}
-                              PreTag="div"
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={className}>
-                              {children}
-                            </code>
-                          )
-                        }
-                      }}
-                    >
-                      {readme}
-                    </ReactMarkdown>
+                  <div className="prose dark:prose-invert max-w-none prose-table:border-collapse prose-table:w-full prose-th:border prose-th:p-3 prose-td:border prose-td:p-3">
+                    <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeRaw]}
+                          components={{
+                            h1: ({...props}) => (
+                              <h1 className="text-2xl font-black mb-4 border-b border-slate-300 dark:border-slate-700 pb-3 bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent" {...props} />
+                            ),
+                            h2: ({...props}) => (
+                              <h2 className="text-xl font-bold mb-3 text-slate-800 dark:text-slate-100 mt-6" {...props} />
+                            ),
+                            h3: ({...props}) => (
+                              <h3 className="text-lg font-semibold mb-2 text-slate-700 dark:text-slate-200 mt-4" {...props} />
+                            ),
+                            h4: ({...props}) => (
+                              <h4 className="text-base font-medium mb-2 text-slate-700 dark:text-slate-200 mt-3" {...props} />
+                            ),
+                            p: ({...props}) => (
+                              <p className="mb-3 text-slate-600 dark:text-slate-300 leading-relaxed text-sm" {...props} />
+                            ),
+                            ul: ({...props}) => (
+                              <ul className="list-disc list-inside mb-3 text-slate-600 dark:text-slate-300 space-y-1 pl-4" {...props} />
+                            ),
+                            ol: ({...props}) => (
+                              <ol className="list-decimal list-inside mb-3 text-slate-600 dark:text-slate-300 space-y-1 pl-4" {...props} />
+                            ),
+                            li: ({...props}) => (
+                              <li className="mb-1 leading-relaxed text-sm" {...props} />
+                            ),
+                            code: ({inline, className, children, ...props}: {inline?: boolean; children?: React.ReactNode; className?: string}) => {
+                              const match = /language-(\w+)/.exec(className || '');
+                              const language = match ? match[1] : '';
+                              const code = String(children).replace(/\n$/, '');
+                              
+                              // Check if it's a Mermaid diagram
+                              if (!inline && language === 'mermaid') {
+                                return <MermaidDiagram chart={code} />;
+                              }
+                              
+                              return inline ? (
+                                <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-xs font-mono text-slate-700 dark:text-emerald-400 border border-slate-300 dark:border-slate-700" {...props}>
+                                  {children}
+                                </code>
+                              ) : (
+                                <code className="block bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 p-4 rounded-lg text-xs font-mono overflow-x-auto border border-slate-300 dark:border-slate-700" {...props}>
+                                  {children}
+                                </code>
+                              );
+                            },
+                            pre: ({children, ...props}) => {
+                              return (
+                                <pre className="bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 p-4 rounded-lg overflow-x-auto text-xs font-mono mb-4 border border-slate-300 dark:border-slate-700 shadow-inner" {...props}>
+                                  {children}
+                                </pre>
+                              );
+                            },
+                            a: ({...props}) => (
+                              <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors decoration-blue-600/50 dark:decoration-blue-400/50 underline-offset-2" {...props} />
+                            ),
+                            blockquote: ({...props}) => (
+                              <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-slate-100/50 dark:bg-slate-800/50 rounded-r-lg italic text-slate-600 dark:text-slate-300 backdrop-blur-sm" {...props} />
+                            ),
+                            table: ({...props}) => (
+                              <div className="overflow-x-auto mb-6 rounded-lg border border-slate-300 dark:border-slate-600 shadow-lg bg-white dark:bg-slate-800/30">
+                                <table className="min-w-full border-collapse bg-white dark:bg-slate-900" {...props} />
+                              </div>
+                            ),
+                            thead: ({...props}) => (
+                              <thead className="bg-slate-50 dark:bg-slate-800" {...props} />
+                            ),
+                            tbody: ({...props}) => (
+                              <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700" {...props} />
+                            ),
+                            th: ({...props}) => (
+                              <th className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-6 py-3 text-left font-semibold text-slate-900 dark:text-slate-100 text-sm" {...props} />
+                            ),
+                            td: ({...props}) => (
+                              <td className="border border-slate-300 dark:border-slate-700 px-6 py-3 text-slate-700 dark:text-slate-300 text-sm" {...props} />
+                            ),
+                            hr: ({...props}) => (
+                              <hr className="my-4 border-slate-300 dark:border-slate-700" {...props} />
+                            ),
+                            img: ({...props}) => (
+                              <img className="max-w-full h-auto rounded-lg shadow-xl my-4 border border-slate-300 dark:border-slate-700" {...props} />
+                            ),
+                          }}
+                        >
+                          {readme}
+                        </ReactMarkdown>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -1296,9 +1387,7 @@ ${example.code}
                           <h3 className="text-lg font-semibold mb-2">Architecture Diagram</h3>
                           <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded">
                             <pre className="text-sm">
-                              {typeof analysis.documentation.mermaidDiagram === 'string' 
-                                ? analysis.documentation.mermaidDiagram 
-                                : 'No diagram available'}
+                              <MermaidDiagram chart={analysis.documentation.mermaidDiagram} />
                             </pre>
                           </div>
                         </div>
