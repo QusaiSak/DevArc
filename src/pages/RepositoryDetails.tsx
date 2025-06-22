@@ -1,38 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  Star,
-  GitFork,
-  Calendar,
-  FileText,
-  Code,
-  TestTube,
-  BookOpen,
-  Download,
-  Activity,
-  BarChart3,
-  Loader2,
-  AlertCircle,
-  Github,
-  Eye,
-  GitCommit,
-  Users,
-  Clock,
-  Target,
-  FileCode,
-  Bug,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/AuthContext";
 import { GitHubService } from "@/lib/github";
 import { StructureAnalyzer } from "@/lib/structure";
@@ -44,13 +14,17 @@ import {
   removeFavorite,
 } from "@/lib/favoritesService";
 import type { ComprehensiveDocumentation } from "@/types/codeparser.interface";
-import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { toast } from "sonner";
-import MermaidDiagram from "@/components/MermaidDiagram";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import {
+  RepositoryHeader,
+  ReadmeViewer,
+  AnalysisTab,
+  DocumentationTab,
+  TestCasesTab,
+  CommitsTab,
+  OverviewTab,
+} from "@/components/repository";
 
 interface RepositoryData {
   id: number;
@@ -73,6 +47,22 @@ interface RepositoryData {
     login: string;
     avatar_url: string;
   };
+}
+
+interface CommitData {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      name: string;
+      date: string;
+    };
+  };
+  html_url: string;
+}
+
+interface GitHubCommitsResponse {
+  data?: CommitData[];
 }
 
 interface AnalysisResults {
@@ -104,9 +94,6 @@ interface AnalysisResults {
     framework: string;
   };
 }
-
-// Remove unused `GitHubFile` and `repositoryName`
-// Removed the `GitHubFile` interface and `repositoryName` variable as they are not used.
 
 export default function RepositoryDetailsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -150,41 +137,64 @@ export default function RepositoryDetailsPage() {
       // Load stored analysis if available
       getAnalysis(user.id, projectId)
         .then(({ analysis }) => {
-          if (analysis.structure) {
-            setAnalysis((prev) => ({
-              ...prev,
-              structure:
+          try {
+            if (analysis.structure) {
+              const parsedStructure =
                 typeof analysis.structure === "string"
                   ? JSON.parse(analysis.structure)
-                  : analysis.structure,
-            }));
+                  : analysis.structure;
+              setAnalysis((prev) => ({
+                ...prev,
+                structure: parsedStructure,
+              }));
+            }
+          } catch (e) {
+            console.warn("Failed to parse structure analysis:", e);
           }
-          if (analysis.codeAnalysis) {
-            setAnalysis((prev) => ({
-              ...prev,
-              codeAnalysis:
+
+          try {
+            if (analysis.codeAnalysis) {
+              const parsedCodeAnalysis =
                 typeof analysis.codeAnalysis === "string"
                   ? JSON.parse(analysis.codeAnalysis)
-                  : analysis.codeAnalysis,
-            }));
+                  : analysis.codeAnalysis;
+              setAnalysis((prev) => ({
+                ...prev,
+                codeAnalysis: parsedCodeAnalysis,
+              }));
+            }
+          } catch (e) {
+            console.warn("Failed to parse code analysis:", e);
           }
-          if (analysis.documentation) {
-            setAnalysis((prev) => ({
-              ...prev,
-              documentation:
+
+          try {
+            if (analysis.documentation) {
+              const parsedDocumentation =
                 typeof analysis.documentation === "string"
                   ? JSON.parse(analysis.documentation)
-                  : analysis.documentation,
-            }));
+                  : analysis.documentation;
+              setAnalysis((prev) => ({
+                ...prev,
+                documentation: parsedDocumentation,
+              }));
+            }
+          } catch (e) {
+            console.warn("Failed to parse documentation analysis:", e);
           }
-          if (analysis.testCases) {
-            setAnalysis((prev) => ({
-              ...prev,
-              testCases:
+
+          try {
+            if (analysis.testCases) {
+              const parsedTestCases =
                 typeof analysis.testCases === "string"
                   ? JSON.parse(analysis.testCases)
-                  : analysis.testCases,
-            }));
+                  : analysis.testCases;
+              setAnalysis((prev) => ({
+                ...prev,
+                testCases: parsedTestCases,
+              }));
+            }
+          } catch (e) {
+            console.warn("Failed to parse test cases analysis:", e);
           }
         })
         .catch(() => {
@@ -217,42 +227,59 @@ export default function RepositoryDetailsPage() {
         )) as RepositoryData;
         setRepository(repoData);
 
-        const readmeContent = await githubService.getReadme(owner, repo);
-        setReadme(readmeContent);
+        // Fetch README
+        try {
+          const readmeContent = await githubService.getReadme(owner, repo);
+          setReadme(readmeContent);
+        } catch (readmeError) {
+          console.log("No README found:", readmeError);
+        }
 
-        const commitsData = (await githubService.fetch(
-          `repos/${owner}/${repo}/commits`
-        )) as Array<{
-          sha: string;
-          commit: {
-            message: string;
-            author: {
-              name: string;
-              date: string;
-            };
-          };
-          html_url: string;
-        }>;
-        if (Array.isArray(commitsData)) {
+        // Fetch commits
+        try {
+          const commitsData = await githubService.fetch(
+            `repos/${owner}/${repo}/commits?per_page=10`
+          );
+
+          // Handle both direct array response and response object with data property
+          let commitsArray: CommitData[] = [];
+          if (Array.isArray(commitsData)) {
+            commitsArray = commitsData as CommitData[];
+          } else if (
+            commitsData &&
+            typeof commitsData === "object" &&
+            "data" in commitsData &&
+            Array.isArray((commitsData as GitHubCommitsResponse).data)
+          ) {
+            commitsArray = (commitsData as GitHubCommitsResponse).data || [];
+          } else {
+            console.warn(
+              "Commits data is not in expected format:",
+              commitsData
+            );
+            commitsArray = [];
+          }
+
           setCommits(
-            commitsData.map((commit) => ({
-              sha: commit.sha,
+            commitsArray.map((commit: CommitData) => ({
+              sha: commit.sha || "",
               commit: {
-                message: commit.commit.message,
+                message: commit.commit?.message || "",
                 author: {
-                  name: commit.commit.author?.name || "Unknown",
-                  date: commit.commit.author?.date || "Unknown",
+                  name: commit.commit?.author?.name || "Unknown",
+                  date: commit.commit?.author?.date || new Date().toISOString(),
                 },
               },
-              html_url: commit.html_url,
+              html_url: commit.html_url || "",
             }))
           );
-        } else {
-          setCommits([]);
+        } catch (commitsError) {
+          console.log("Could not fetch commits:", commitsError);
+          setCommits([]); // Ensure commits is always an array
         }
       } catch (error) {
-        console.error("Error fetching repository data:", error);
-        setError("Failed to fetch repository data");
+        console.error("Failed to fetch repository data:", error);
+        setError("Failed to load repository data");
       } finally {
         setLoading(false);
       }
@@ -276,7 +303,7 @@ export default function RepositoryDetailsPage() {
 
       const tokenData = await tokenResponse.json();
       if (!tokenData.success) {
-        throw new Error("GitHub token not found");
+        throw new Error("Failed to get GitHub token");
       }
 
       // Run structure analysis
@@ -292,7 +319,6 @@ export default function RepositoryDetailsPage() {
         codeAnalysis,
       });
 
-      // Note: Analysis is now complete but not stored yet
       console.log("Analysis completed successfully - ready to store");
     } catch (error) {
       console.error("Analysis failed:", error);
@@ -387,7 +413,6 @@ export default function RepositoryDetailsPage() {
         documentation,
       }));
 
-      // DON'T automatically save - only update local state
       console.log("Documentation generated successfully - ready to store");
     } catch (error) {
       console.error("Documentation generation failed:", error);
@@ -436,7 +461,6 @@ export default function RepositoryDetailsPage() {
         testCases: updatedTestCases,
       }));
 
-      // DON'T automatically save - only update local state
       console.log("Test cases generated successfully - ready to store");
     } catch (error) {
       console.error("Test generation failed:", error);
@@ -444,22 +468,6 @@ export default function RepositoryDetailsPage() {
     } finally {
       setGeneratingTests(false);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   // Export documentation to Word format
@@ -485,338 +493,6 @@ ${
     .join("\n") || "No technologies specified"
 }
 
-### Architecture Layers
-${
-  documentation.architecture?.layers
-    ?.map(
-      (layer) => `
-**${layer.name}**
-${layer.description}
-Components: ${layer.components?.join(", ") || "None"}
-`
-    )
-    .join("\n") || "No architecture layers defined"
-}
-
-## Folder Structure
-\`\`\`
-${documentation.folderStructure?.tree || "No folder structure available"}
-\`\`\`
-
-### Directory Details
-${
-  documentation.folderStructure?.directories
-    ?.map(
-      (dir) => `
-**${dir.path}** (${dir.type})
-Purpose: ${dir.purpose}
-Files: ${dir.fileCount}
-${dir.description}
-`
-    )
-    .join("\n") || "No directory details available"
-}
-
-## Code Internals
-
-### Code Flow
-${documentation.codeInternals?.codeFlow || "No code flow description available"}
-
-### Data Flow
-${documentation.codeInternals?.dataFlow || "No data flow description available"}
-
-### Key Algorithms
-${
-  documentation.codeInternals?.keyAlgorithms
-    ?.map(
-      (algo) => `
-**${algo.name}** (${algo.file})
-${algo.description}
-Implementation: ${algo.implementation}
-Complexity: ${algo.complexity}
-`
-    )
-    .join("\n") || "No key algorithms documented"
-}
-
-### Design Patterns
-${
-  documentation.codeInternals?.designPatterns
-    ?.map(
-      (pattern) => `
-**${pattern.pattern}**
-Usage: ${pattern.usage}
-Files: ${pattern.files?.join(", ") || "None"}
-${pattern.description}
-`
-    )
-    .join("\n") || "No design patterns documented"
-}
-
-### Business Logic
-${
-  documentation.codeInternals?.businessLogic
-    ?.map(
-      (logic) => `
-**${logic.module}**
-Purpose: ${logic.purpose}
-Workflow: ${logic.workflow}
-Files: ${logic.files?.join(", ") || "None"}
-`
-    )
-    .join("\n") || "No business logic documented"
-}
-
-## SDLC Documentation
-
-### Development Workflow
-${
-  documentation.sdlc?.developmentWorkflow ||
-  "No development workflow documented"
-}
-
-### Setup Instructions
-${
-  documentation.sdlc?.setupInstructions
-    ?.map(
-      (step) => `
-${step.step}. **${step.title}**
-   ${step.description}
-   \`\`\`bash
-   ${step.commands?.join("\n   ") || "No commands"}
-   \`\`\`
-`
-    )
-    .join("\n") || "No setup instructions available"
-}
-
-### Build Process
-${
-  documentation.sdlc?.buildProcess?.description || "No build process documented"
-}
-
-**Steps:**
-${
-  documentation.sdlc?.buildProcess?.steps
-    ?.map((step) => `- ${step}`)
-    .join("\n") || "No build steps documented"
-}
-
-**Tools:**
-${
-  documentation.sdlc?.buildProcess?.tools
-    ?.map((tool) => `- ${tool}`)
-    .join("\n") || "No build tools documented"
-}
-
-### Testing Strategy
-**Approach:** ${
-        documentation.sdlc?.testingStrategy?.approach ||
-        "No testing approach documented"
-      }
-**Coverage:** ${documentation.sdlc?.testingStrategy?.coverage || "Unknown"}
-
-**Test Types:**
-${
-  documentation.sdlc?.testingStrategy?.testTypes
-    ?.map((type) => `- ${type}`)
-    .join("\n") || "No test types documented"
-}
-
-**Frameworks:**
-${
-  documentation.sdlc?.testingStrategy?.frameworks
-    ?.map((framework) => `- ${framework}`)
-    .join("\n") || "No testing frameworks documented"
-}
-
-### Deployment Guide
-${
-  documentation.sdlc?.deploymentGuide?.process ||
-  "No deployment process documented"
-}
-
-**Environments:** ${
-        documentation.sdlc?.deploymentGuide?.environments?.join(", ") ||
-        "No environments specified"
-      }
-
-${
-  documentation.sdlc?.deploymentGuide?.steps
-    ?.map(
-      (envStep) => `
-**${envStep.environment}:**
-${envStep.steps?.map((step) => `- ${step}`).join("\n") || "No steps specified"}
-`
-    )
-    .join("\n") || "No deployment steps documented"
-}
-
-### Maintenance
-**Guidelines:**
-${
-  documentation.sdlc?.maintenance?.guidelines
-    ?.map((guide) => `- ${guide}`)
-    .join("\n") || "No maintenance guidelines documented"
-}
-
-**Monitoring:**
-${
-  documentation.sdlc?.maintenance?.monitoring
-    ?.map((monitor) => `- ${monitor}`)
-    .join("\n") || "No monitoring information documented"
-}
-
-**Troubleshooting:**
-${
-  documentation.sdlc?.maintenance?.troubleshooting
-    ?.map(
-      (trouble) => `
-**Issue:** ${trouble.issue}
-**Solution:** ${trouble.solution}
-`
-    )
-    .join("\n") || "No troubleshooting information documented"
-}
-
-## System Architecture Diagram (Mermaid)
-\`\`\`mermaid
-${documentation.mermaidDiagram || "No architecture diagram available"}
-\`\`\`
-
-## Components (${documentation.components?.length || 0})
-${
-  documentation.components
-    ?.map(
-      (component) => `
-### ${component.name} (${component.type})
-**File**: ${component.file}
-**Description**: ${component.description}
-
-**Internals:**
-- Purpose: ${component.internals?.purpose || "Unknown"}
-- Key Methods: ${component.internals?.keyMethods?.join(", ") || "None"}
-- State Management: ${component.internals?.stateManagement || "Unknown"}
-- Lifecycle: ${component.internals?.lifecycle || "Unknown"}
-
-**Dependencies**: ${component.dependencies?.join(", ") || "None"}
-**Exports**: ${component.exports?.join(", ") || "None"}
-`
-    )
-    .join("\n") || "No components documented"
-}
-
-## API Endpoints (${documentation.apis?.length || 0})
-${
-  documentation.apis
-    ?.map(
-      (api) => `
-### ${api.method} ${api.endpoint}
-**Description**: ${api.description}
-
-**Parameters**:
-${
-  api.parameters
-    ?.map(
-      (param) => `- **${param.name}** (${param.type}): ${param.description}`
-    )
-    .join("\n") || "No parameters"
-}
-
-**Response**: ${api.response}
-
-**Implementation Details:**
-- Implementation: ${api.internals?.implementation || "Unknown"}
-- Validation: ${api.internals?.validation || "Unknown"}
-- Error Handling: ${api.internals?.errorHandling || "Unknown"}
-- Authentication: ${api.internals?.authentication || "Unknown"}
-`
-    )
-    .join("\n") || "No API endpoints documented"
-}
-
-## Functions & Methods (${documentation.functions?.length || 0})
-${
-  documentation.functions
-    ?.map(
-      (func) => `
-### ${func.name} (${func.type})
-**File**: ${func.file}
-**Description**: ${func.description}
-
-**Parameters**:
-${
-  func.parameters
-    ?.map(
-      (param) => `- **${param.name}** (${param.type}): ${param.description}`
-    )
-    .join("\n") || "No parameters"
-}
-
-**Returns**: ${func.returns?.type || "void"} - ${
-        func.returns?.description || "No description"
-      }
-
-**Internal Details:**
-- Algorithm: ${func.internals?.algorithm || "Unknown"}
-- Complexity: ${func.internals?.complexity || "Unknown"}
-- Side Effects: ${func.internals?.sideEffects || "None"}
-- Dependencies: ${func.internals?.dependencies?.join(", ") || "None"}
-`
-    )
-    .join("\n") || "No functions documented"
-}
-
-## Data Models & Interfaces (${documentation.dataModels?.length || 0})
-${
-  documentation.dataModels
-    ?.map(
-      (model) => `
-### ${model.name} (${model.type})
-**File**: ${model.file}
-
-**Properties**:
-${
-  model.properties
-    ?.map((prop) => `- **${prop.name}** (${prop.type}): ${prop.description}`)
-    .join("\n") || "No properties documented"
-}
-
-**Relationships**:
-${
-  model.relationships
-    ?.map((rel) => `- ${rel.model} (${rel.type}): ${rel.description}`)
-    .join("\n") || "No relationships documented"
-}
-
-**Validation**:
-${
-  model.validation?.map((rule) => `- ${rule}`).join("\n") ||
-  "No validation rules documented"
-}
-`
-    )
-    .join("\n") || "No data models documented"
-}
-
-## Usage Examples
-${
-  documentation.examples
-    ?.map(
-      (example) => `
-### ${example.title}
-${example.description}
-
-\`\`\`${repository?.language?.toLowerCase() || "javascript"}
-${example.code}
-\`\`\`
-
-**Explanation:** ${example.explanation}
-`
-    )
-    .join("\n") || "No usage examples documented"
-}
-
 ---
 *Generated on ${new Date().toLocaleDateString()} for ${
         repository?.full_name || "Repository"
@@ -840,11 +516,9 @@ ${example.code}
       // Clean up
       URL.revokeObjectURL(url);
 
-      // Show success message (you could add a toast notification here)
       console.log("Documentation exported successfully!");
     } catch (error) {
       console.error("Failed to export documentation:", error);
-      // Show error message (you could add a toast notification here)
     }
   };
 
@@ -853,24 +527,29 @@ ${example.code}
     if (owner && repo && user && repository) {
       try {
         if (isFavorite) {
-          // Use the same repoId format as when adding
           await removeFavorite(user.id, repository.id.toString());
           setIsFavorite(false);
-          toast.success("Removed from Favorites", {
-            description: `${repository.name} has been removed from your favorites.`,
-          });
+          toast.success("Removed from favorites");
         } else {
-          await addFavorite(user.id, repository);
-          setIsFavorite(true);
-          toast.success("Added to Favorites", {
-            description: `${repository.name} has been added to your favorites.`,
+          await addFavorite(user.id, {
+            id: repository.id,
+            name: repository.name,
+            owner: {
+              login: repository.owner.login,
+              avatar_url: repository.owner.avatar_url,
+            },
+            description: repository.description,
+            language: repository.language,
+            stargazers_count: repository.stargazers_count,
+            forks_count: repository.forks_count,
+            html_url: repository.html_url,
           });
+          setIsFavorite(true);
+          toast.success("Added to favorites");
         }
       } catch (error) {
         console.error("Failed to toggle favorite:", error);
-        toast.error("Error", {
-          description: "Failed to update favorites. Please try again.",
-        });
+        toast.error("Failed to update favorites");
       }
     }
   };
@@ -879,9 +558,9 @@ ${example.code}
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">
-            Loading repository details...
+            Loading repository...
           </p>
         </div>
       </div>
@@ -892,19 +571,16 @@ ${example.code}
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                Error Loading Repository
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                {error || "Repository not found"}
-              </p>
-              <Button onClick={() => navigate("/dashboard")}>
-                Back to Dashboard
-              </Button>
-            </div>
+          <CardContent className="pt-6 text-center">
+            <h3 className="text-lg font-semibold mb-2">
+              Error Loading Repository
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              {error || "Repository not found"}
+            </p>
+            <Button onClick={() => navigate("/dashboard")}>
+              Back to Dashboard
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -912,1393 +588,126 @@ ${example.code}
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                {repository.name}
-              </h1>
-              <p className="text-slate-600 dark:text-slate-400 mb-4">
-                {repository.description || "No description available"}
-              </p>
-              <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
-                <div className="flex items-center space-x-1">
-                  <Star className="w-4 h-4" />
-                  <span>{repository.stargazers_count}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <GitFork className="w-4 h-4" />
-                  <span>{repository.forks_count}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Eye className="w-4 h-4" />
-                  <span>{repository.watchers_count}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Bug className="w-4 h-4" />
-                  <span>{repository.open_issues_count} issues</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>Updated {formatDate(repository.updated_at)}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                onClick={toggleFavorite}
-                className={
-                  isFavorite
-                    ? "bg-yellow-50 border-yellow-200 text-yellow-700"
-                    : ""
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950">
+        <div className="container mx-auto px-4 py-8">
+          {/* Repository Header Component */}
+          <RepositoryHeader
+            repository={repository}
+            isFavorite={isFavorite}
+            analyzing={analyzing}
+            generatingDocs={generatingDocs}
+            generatingTests={generatingTests}
+            analysis={analysis}
+            onToggleFavorite={toggleFavorite}
+            onRunAnalysis={runAnalysis}
+            onStoreAnalysis={storeAnalysis}
+            onGenerateDocumentation={generateDocumentation}
+            onGenerateTestCases={generateTestCases}
+          />
+
+          {/* Main Content Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="readme">README</TabsTrigger>
+              <TabsTrigger value="analysis">Analysis</TabsTrigger>
+              <TabsTrigger value="documentation">Documentation</TabsTrigger>
+              <TabsTrigger value="tests">Test Cases</TabsTrigger>
+              <TabsTrigger value="commits">Git History</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              <OverviewTab
+                repository={repository}
+                onStoreAnalysis={storeAnalysis}
+                hasAnalysisData={
+                  !!(
+                    analysis.structure ||
+                    analysis.codeAnalysis ||
+                    analysis.documentation ||
+                    analysis.testCases
+                  )
                 }
-              >
-                <Star
-                  className={`w-4 h-4 mr-2 ${isFavorite ? "fill-current" : ""}`}
-                />
-                {isFavorite ? "Favorited" : "Add to Favorites"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => window.open(repository.html_url, "_blank")}
-              >
-                <Github className="w-4 h-4 mr-2" />
-                View on GitHub
-              </Button>
-            </div>
-          </div>
+              />
+            </TabsContent>
 
-          {/* Action Buttons */}
-          <div className="flex space-x-2">
-            <Button
-              onClick={runAnalysis}
-              disabled={analyzing}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {analyzing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Run Analysis
-                </>
-              )}
-            </Button>
-            {/* Show Store Analysis button if ANY analysis data exists */}
-            {(analysis.structure ||
-              analysis.codeAnalysis ||
-              analysis.documentation ||
-              analysis.testCases) && (
-              <Button
-                onClick={storeAnalysis}
-                variant="outline"
-                className="bg-green-600 hover:bg-green-700 text-white border-green-600"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Store Analysis
-              </Button>
-            )}
-            <Button
-              onClick={generateDocumentation}
-              disabled={generatingDocs}
-              variant="outline"
-            >
-              {generatingDocs ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  Generate Docs
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={generateTestCases}
-              disabled={generatingTests}
-              variant="outline"
-            >
-              {generatingTests ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <TestTube className="w-4 h-4 mr-2" />
-                  Generate Tests
-                </>
-              )}
-            </Button>
-          </div>
+            <TabsContent value="readme" className="space-y-6">
+              <ReadmeViewer
+                readme={readme}
+                onStoreAnalysis={storeAnalysis}
+                hasAnalysisData={
+                  !!(
+                    analysis.structure ||
+                    analysis.codeAnalysis ||
+                    analysis.documentation ||
+                    analysis.testCases
+                  )
+                }
+              />
+            </TabsContent>
+
+            <TabsContent value="analysis">
+              <AnalysisTab
+                analysis={analysis}
+                onRunAnalysis={runAnalysis}
+                onStoreAnalysis={storeAnalysis}
+                analyzing={analyzing}
+              />
+            </TabsContent>
+
+            <TabsContent value="documentation">
+              <DocumentationTab
+                documentation={analysis.documentation}
+                onGenerateDocumentation={generateDocumentation}
+                onStoreAnalysis={storeAnalysis}
+                onExportToWord={exportToWord}
+                generatingDocs={generatingDocs}
+                hasAnalysisData={
+                  !!(
+                    analysis.structure ||
+                    analysis.codeAnalysis ||
+                    analysis.documentation ||
+                    analysis.testCases
+                  )
+                }
+              />
+            </TabsContent>
+
+            <TabsContent value="tests">
+              <TestCasesTab
+                testCases={analysis.testCases}
+                onGenerateTestCases={generateTestCases}
+                onStoreAnalysis={storeAnalysis}
+                generatingTests={generatingTests}
+                hasAnalysisData={
+                  !!(
+                    analysis.structure ||
+                    analysis.codeAnalysis ||
+                    analysis.documentation ||
+                    analysis.testCases
+                  )
+                }
+              />
+            </TabsContent>
+
+            <TabsContent value="commits">
+              <CommitsTab
+                commits={commits}
+                onStoreAnalysis={storeAnalysis}
+                hasAnalysisData={
+                  !!(
+                    analysis.structure ||
+                    analysis.codeAnalysis ||
+                    analysis.documentation ||
+                    analysis.testCases
+                  )
+                }
+              />
+            </TabsContent>
+          </Tabs>
         </div>
-
-        {/* Main Content Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="readme">README</TabsTrigger>
-            <TabsTrigger value="analysis">Analysis</TabsTrigger>
-            <TabsTrigger value="documentation">Documentation</TabsTrigger>
-            <TabsTrigger value="tests">Test Cases</TabsTrigger>
-            <TabsTrigger value="commits">Git History</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        Language
-                      </p>
-                      <p className="text-2xl font-bold">
-                        {repository.language || "Mixed"}
-                      </p>
-                    </div>
-                    <Code className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        Size
-                      </p>
-                      <p className="text-2xl font-bold">
-                        {formatBytes(repository.size * 1024)}
-                      </p>
-                    </div>
-                    <FileCode className="h-8 w-8 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        Created
-                      </p>
-                      <p className="text-2xl font-bold">
-                        {formatDate(repository.created_at)}
-                      </p>
-                    </div>
-                    <Calendar className="h-8 w-8 text-purple-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        Last Push
-                      </p>
-                      <p className="text-2xl font-bold">
-                        {formatDate(repository.pushed_at)}
-                      </p>
-                    </div>
-                    <Activity className="h-8 w-8 text-orange-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {analysis.structure && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Project Structure Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-600">
-                        {analysis.structure.totalFiles}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Total Files
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-green-600">
-                        {analysis.structure.totalLines}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Lines of Code
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-purple-600">
-                        {analysis.structure.testCoverage}%
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Test Coverage
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-orange-600">
-                        {analysis.structure.complexity.average.toFixed(2)}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Avg Complexity
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="readme" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5" />
-                  <span>README</span>
-                </CardTitle>
-                <CardDescription>
-                  Repository documentation and setup instructions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {readme ? (
-                  <div className="prose dark:prose-invert max-w-none prose-table:border-collapse prose-table:w-full prose-th:border prose-th:p-3 prose-td:border prose-td:p-3">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw]}
-                      components={{
-                        h1: ({ ...props }) => (
-                          <h1
-                            className="text-3xl font-bold mb-6 pb-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent animate-in slide-in-from-left duration-500"
-                            {...props}
-                          />
-                        ),
-                        h2: ({ ...props }) => (
-                          <h2
-                            className="text-2xl font-bold mb-4 mt-8 text-slate-900 dark:text-white relative group animate-in slide-in-from-left duration-500"
-                            {...props}
-                          />
-                        ),
-                        h3: ({ ...props }) => (
-                          <h3
-                            className="text-xl font-semibold mb-3 mt-6 text-slate-900 dark:text-white animate-in fade-in duration-500"
-                            {...props}
-                          />
-                        ),
-                        h4: ({ ...props }) => (
-                          <h4
-                            className="text-lg font-medium mb-2 mt-4 text-slate-900 dark:text-white"
-                            {...props}
-                          />
-                        ),
-                        p: ({ ...props }) => (
-                          <p
-                            className="mb-4 leading-relaxed text-slate-700 dark:text-slate-300 animate-in fade-in duration-700"
-                            {...props}
-                          />
-                        ),
-                        ul: ({ ...props }) => (
-                          <ul
-                            className="list-disc list-inside mb-4 space-y-2 pl-4 text-slate-700 dark:text-slate-300"
-                            {...props}
-                          />
-                        ),
-                        ol: ({ ...props }) => (
-                          <ol
-                            className="list-none mb-4 space-y-3 pl-0 text-slate-700 dark:text-slate-300 counter-reset-[ordered-list]"
-                            {...props}
-                          />
-                        ),
-                        li: ({ ...props }) => (
-                          <li
-                            className="mb-1 leading-relaxed hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
-                            {...props}
-                          />
-                        ),
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        code: (props: any) => {
-                          const { className, children, ...rest } = props;
-                          const match = /language-(\w+)/.exec(className || "");
-                          const language = match ? match[1] : "";
-                          const code = String(children).replace(/\n$/, "");
-                          const isInline = !className || !match;
-
-                          if (!isInline && language === "mermaid") {
-                            return <MermaidDiagram chart={code} />;
-                          }
-
-                          return isInline ? (
-                            <code
-                              className="bg-slate-100/80 dark:bg-slate-800/80 px-2 py-1 rounded-md text-sm font-mono text-slate-900 dark:text-slate-100 border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 transition-colors duration-200"
-                              {...rest}
-                            >
-                              {children}
-                            </code>
-                          ) : (
-                            <div className="relative group">
-                              <code
-                                className="block bg-slate-100/60 dark:bg-slate-800/60 p-4 rounded-lg text-sm font-mono overflow-x-auto text-slate-900 dark:text-slate-100 border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-all duration-200"
-                                {...rest}
-                              >
-                                {children}
-                              </code>
-                              <div className="absolute  top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
-                                >
-                                  {language || "code"}
-                                </Badge>
-                              </div>
-                            </div>
-                          );
-                        },
-                        pre: ({ children, ...props }) => (
-                          <pre
-                            className="bg-slate-100/60 dark:bg-slate-800/60 p-6 rounded-xl overflow-x-auto text-sm font-mono mb-6 border border-slate-200/50 dark:border-slate-700/50 shadow-inner hover:shadow-lg transition-shadow duration-300 group"
-                            {...props}
-                          >
-                            {children}
-                          </pre>
-                        ),
-                        a: ({ ...props }) => (
-                          <a
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium transition-all duration-200 relative group"
-                            {...props}
-                          />
-                        ),
-                        blockquote: ({ ...props }) => (
-                          <blockquote
-                            className="border-l-4 border-blue-500/50 pl-6 py-4 my-6 bg-blue-50/50 dark:bg-blue-950/20 rounded-r-xl italic text-slate-700 dark:text-slate-300 relative overflow-hidden group hover:bg-blue-100/50 dark:hover:bg-blue-950/30 transition-colors duration-300"
-                            {...props}
-                          />
-                        ),
-                        table: ({ ...props }) => (
-                          <div className="overflow-x-auto mb-8 rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:shadow-xl transition-shadow duration-300">
-                            <table
-                              className="min-w-full border-collapse"
-                              {...props}
-                            />
-                          </div>
-                        ),
-                        thead: ({ ...props }) => (
-                          <thead
-                            className="bg-gradient-to-r from-slate-100/60 to-slate-200/40 dark:from-slate-800/60 dark:to-slate-700/40"
-                            {...props}
-                          />
-                        ),
-                        tbody: ({ ...props }) => (
-                          <tbody
-                            className="divide-y divide-slate-200/30 dark:divide-slate-700/30"
-                            {...props}
-                          />
-                        ),
-                        th: ({ ...props }) => (
-                          <th
-                            className="bg-slate-100/40 dark:bg-slate-800/40 border-r border-slate-200/30 dark:border-slate-700/30 last:border-r-0 px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100"
-                            {...props}
-                          />
-                        ),
-                        td: ({ ...props }) => (
-                          <td
-                            className="border-r border-slate-200/20 dark:border-slate-700/20 last:border-r-0 px-6 py-4 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors duration-200"
-                            {...props}
-                          />
-                        ),
-                        hr: ({ ...props }) => (
-                          <hr
-                            className="my-8 border-slate-200/50 dark:border-slate-700/50"
-                            {...props}
-                          />
-                        ),
-                        img: ({ ...props }) => (
-                          <img
-                            className="max-w-full h-auto rounded-xl shadow-lg my-6 border border-slate-200/50 dark:border-slate-700/50 hover:shadow-xl transition-shadow duration-300"
-                            {...props}
-                          />
-                        ),
-                      }}
-                    >
-                      {readme}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg mb-2">No README found</p>
-                    <p className="text-sm">
-                      This repository doesn't have a README file.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analysis">
-            {analysis.codeAnalysis ? (
-              <div className="space-y-6">
-                {/* Store Analysis button at the top of analysis tab */}
-                <div className="flex justify-end">
-                  <Button
-                    onClick={storeAnalysis}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Store All Analysis Data
-                  </Button>
-                </div>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Code Quality Analysis</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <div className="mb-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium">
-                              Quality Score
-                            </span>
-                            <span className="text-sm font-bold">
-                              {analysis.codeAnalysis.qualityScore}/100
-                            </span>
-                          </div>
-                          <Progress
-                            value={analysis.codeAnalysis.qualityScore}
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium">
-                              Maintainability Index
-                            </span>
-                            <span className="text-sm font-bold">
-                              {analysis.codeAnalysis.maintainabilityIndex}/100
-                            </span>
-                          </div>
-                          <Progress
-                            value={analysis.codeAnalysis.maintainabilityIndex}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-2 text-green-600">
-                          Strengths
-                        </h4>
-                        <ul className="list-disc list-inside space-y-1 mb-4">
-                          {analysis.codeAnalysis.strengths.map(
-                            (strength, index) => (
-                              <li key={index} className="text-sm">
-                                {strength}
-                              </li>
-                            )
-                          )}
-                        </ul>
-                        <h4 className="font-semibold mb-2 text-orange-600">
-                          Areas for Improvement
-                        </h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          {analysis.codeAnalysis.weaknesses.map(
-                            (weakness, index) => (
-                              <li key={index} className="text-sm">
-                                {weakness}
-                              </li>
-                            )
-                          )}
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recommendations</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {analysis.codeAnalysis.recommendations.map(
-                        (recommendation, index) => (
-                          <div
-                            key={index}
-                            className="flex items-start space-x-2"
-                          >
-                            <Target className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm">{recommendation}</span>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No Analysis Available
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Run analysis to get detailed insights about this
-                      repository
-                    </p>
-                    <div className="flex justify-center space-x-2">
-                      <Button onClick={runAnalysis} disabled={analyzing}>
-                        {analyzing ? "Analyzing..." : "Run Analysis"}
-                      </Button>
-                      {/* Show Store button if ANY analysis data exists */}
-                      {(analysis.structure ||
-                        analysis.codeAnalysis ||
-                        analysis.documentation ||
-                        analysis.testCases) && (
-                        <Button
-                          onClick={storeAnalysis}
-                          variant="outline"
-                          className="bg-green-600 hover:bg-green-700 text-white border-green-600"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Store Analysis
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="documentation">
-            {analysis.documentation ? (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Enhanced Documentation</span>
-                      <div className="flex space-x-2">
-                        <Button
-                          onClick={() => exportToWord(analysis.documentation!)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Export
-                        </Button>
-                        <Button
-                          onClick={storeAnalysis}
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Store All Data
-                        </Button>
-                      </div>
-                    </CardTitle>
-                    <CardDescription>
-                      Comprehensive documentation with code internals, SDLC
-                      guide, and architecture
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">
-                          Project Summary
-                        </h3>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {typeof analysis.documentation.summary === "string"
-                            ? analysis.documentation.summary
-                            : typeof analysis.documentation.summary === "object"
-                            ? JSON.stringify(analysis.documentation.summary)
-                            : "No summary available"}
-                        </p>
-                      </div>
-
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">
-                          Architecture Overview
-                        </h3>
-                        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                          <p className="font-medium">
-                            Pattern:{" "}
-                            {typeof analysis.documentation.architecture
-                              ?.pattern === "string"
-                              ? analysis.documentation.architecture.pattern
-                              : "Unknown pattern"}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {typeof analysis.documentation.architecture
-                              ?.description === "string"
-                              ? analysis.documentation.architecture.description
-                              : "No description available"}
-                          </p>
-                          <div className="mt-2">
-                            <span className="text-sm font-medium">
-                              Technologies:{" "}
-                            </span>
-                            {analysis.documentation.architecture?.technologies?.map(
-                              (tech, index) => (
-                                <Badge
-                                  key={index}
-                                  variant="secondary"
-                                  className="mr-1"
-                                >
-                                  {typeof tech === "string" ? tech : "Unknown"}
-                                </Badge>
-                              )
-                            ) || (
-                              <span className="text-sm text-gray-500">
-                                No technologies specified
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Show Architecture Layers if available */}
-                          {analysis.documentation.architecture?.layers?.length >
-                            0 && (
-                            <div className="mt-4">
-                              <h4 className="text-sm font-semibold mb-2">
-                                Architecture Layers:
-                              </h4>
-                              <div className="space-y-2">
-                                {analysis.documentation.architecture.layers.map(
-                                  (layer, index) => (
-                                    <div
-                                      key={index}
-                                      className="border-l-2 border-blue-500 pl-3"
-                                    >
-                                      <p className="font-medium text-sm">
-                                        {layer.name}
-                                      </p>
-                                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                                        {layer.description}
-                                      </p>
-                                      {layer.components?.length > 0 && (
-                                        <p className="text-xs text-gray-500">
-                                          Components:{" "}
-                                          {layer.components.join(", ")}
-                                        </p>
-                                      )}
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {analysis.documentation.folderStructure?.tree && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">
-                            Folder Structure
-                          </h3>
-                          <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-sm overflow-x-auto">
-                            {analysis.documentation.folderStructure?.tree}
-                          </pre>
-
-                          {/* Show Directory Details if available */}
-                          {analysis.documentation.folderStructure?.directories
-                            ?.length > 0 && (
-                            <div className="mt-4">
-                              <h4 className="text-sm font-semibold mb-2">
-                                Directory Details:
-                              </h4>
-                              <div className="space-y-2">
-                                {analysis.documentation.folderStructure.directories.map(
-                                  (dir, index) => (
-                                    <div
-                                      key={index}
-                                      className="bg-white dark:bg-gray-700 p-3 rounded border"
-                                    >
-                                      <div className="flex items-center justify-between mb-1">
-                                        <span className="font-medium text-sm">
-                                          {dir.path}
-                                        </span>
-                                        <Badge
-                                          variant="outline"
-                                          className="text-xs"
-                                        >
-                                          {dir.type}
-                                        </Badge>
-                                      </div>
-                                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                        {dir.purpose}
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        {dir.description}
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        Files: {dir.fileCount}
-                                      </p>
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {analysis.documentation.codeInternals && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">
-                            Code Internals
-                          </h3>
-                          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                            <div>
-                              <span className="font-medium">Code Flow: </span>
-                              <span className="text-sm">
-                                {typeof analysis.documentation.codeInternals
-                                  .codeFlow === "string"
-                                  ? analysis.documentation.codeInternals
-                                      .codeFlow
-                                  : "No code flow description available"}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium">Data Flow: </span>
-                              <span className="text-sm">
-                                {typeof analysis.documentation.codeInternals
-                                  .dataFlow === "string"
-                                  ? analysis.documentation.codeInternals
-                                      .dataFlow
-                                  : "No data flow description available"}
-                              </span>
-                            </div>
-                            {analysis.documentation.codeInternals.keyAlgorithms
-                              ?.length > 0 && (
-                              <div>
-                                <span className="font-medium">
-                                  Key Algorithms:{" "}
-                                </span>
-                                <span className="text-sm">
-                                  {analysis.documentation.codeInternals
-                                    .keyAlgorithms?.length || 0}{" "}
-                                  documented
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Show Key Algorithms Details */}
-                            {analysis.documentation.codeInternals.keyAlgorithms
-                              ?.length > 0 && (
-                              <div className="mt-4">
-                                <h4 className="text-sm font-semibold mb-2">
-                                  Algorithm Details:
-                                </h4>
-                                <div className="space-y-3">
-                                  {analysis.documentation.codeInternals.keyAlgorithms.map(
-                                    (algo, index) => (
-                                      <div
-                                        key={index}
-                                        className="bg-white dark:bg-gray-700 p-3 rounded border"
-                                      >
-                                        <div className="flex items-center justify-between mb-1">
-                                          <span className="font-medium text-sm">
-                                            {algo.name}
-                                          </span>
-                                          <Badge
-                                            variant="outline"
-                                            className="text-xs"
-                                          >
-                                            {algo.complexity}
-                                          </Badge>
-                                        </div>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                          File: {algo.file}
-                                        </p>
-                                        <p className="text-xs text-gray-500 mb-1">
-                                          {algo.description}
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                          Implementation: {algo.implementation}
-                                        </p>
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Show Design Patterns */}
-                            {analysis.documentation.codeInternals.designPatterns
-                              ?.length > 0 && (
-                              <div className="mt-4">
-                                <h4 className="text-sm font-semibold mb-2">
-                                  Design Patterns:
-                                </h4>
-                                <div className="space-y-3">
-                                  {analysis.documentation.codeInternals.designPatterns.map(
-                                    (pattern, index) => (
-                                      <div
-                                        key={index}
-                                        className="bg-white dark:bg-gray-700 p-3 rounded border"
-                                      >
-                                        <div className="flex items-center justify-between mb-1">
-                                          <span className="font-medium text-sm">
-                                            {pattern.pattern}
-                                          </span>
-                                        </div>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                          Usage: {pattern.usage}
-                                        </p>
-                                        <p className="text-xs text-gray-500 mb-1">
-                                          {pattern.description}
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                          Files: {pattern.files?.join(", ")}
-                                        </p>
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Show Business Logic */}
-                            {analysis.documentation.codeInternals.businessLogic
-                              ?.length > 0 && (
-                              <div className="mt-4">
-                                <h4 className="text-sm font-semibold mb-2">
-                                  Business Logic:
-                                </h4>
-                                <div className="space-y-3">
-                                  {analysis.documentation.codeInternals.businessLogic.map(
-                                    (logic, index) => (
-                                      <div
-                                        key={index}
-                                        className="bg-white dark:bg-gray-700 p-3 rounded border"
-                                      >
-                                        <span className="font-medium text-sm">
-                                          {logic.module}
-                                        </span>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                          Purpose: {logic.purpose}
-                                        </p>
-                                        <p className="text-xs text-gray-500 mb-1">
-                                          Workflow: {logic.workflow}
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                          Files: {logic.files?.join(", ")}
-                                        </p>
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {analysis.documentation.sdlc && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">
-                            SDLC Documentation
-                          </h3>
-                          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-                            <div>
-                              <span className="font-medium">
-                                Development Workflow:{" "}
-                              </span>
-                              <span className="text-sm">
-                                {typeof analysis.documentation.sdlc
-                                  .developmentWorkflow === "string"
-                                  ? analysis.documentation.sdlc
-                                      .developmentWorkflow
-                                  : "No workflow description available"}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium">
-                                Setup Instructions:{" "}
-                              </span>
-                              <span className="text-sm">
-                                {analysis.documentation.sdlc.setupInstructions
-                                  ?.length || 0}{" "}
-                                steps documented
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium">
-                                Testing Strategy:{" "}
-                              </span>
-                              <span className="text-sm">
-                                {typeof analysis.documentation.sdlc
-                                  .testingStrategy?.approach === "string"
-                                  ? analysis.documentation.sdlc.testingStrategy
-                                      .approach
-                                  : "No testing strategy available"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {analysis.documentation.functions?.length > 0 && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-4">
-                            Functions (
-                            {analysis.documentation.functions?.length || 0})
-                          </h3>
-                          <div className="space-y-4 max-h-96 overflow-y-auto">
-                            {analysis.documentation.functions
-                              .slice(0, 5)
-                              .map((func, index) => (
-                                <Card key={index}>
-                                  <CardContent className="pt-4">
-                                    <h4 className="font-semibold mb-2">
-                                      {typeof func.name === "string"
-                                        ? func.name
-                                        : "Unnamed Function"}
-                                    </h4>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                                      {typeof func.description === "string"
-                                        ? func.description
-                                        : "No description available"}
-                                    </p>
-
-                                    {func.parameters?.length > 0 && (
-                                      <div className="mb-3">
-                                        <h5 className="text-sm font-semibold mb-2">
-                                          Parameters:
-                                        </h5>
-                                        <ul className="list-disc list-inside space-y-1">
-                                          {func.parameters.map(
-                                            (
-                                              param: {
-                                                name: string;
-                                                type: string;
-                                                description: string;
-                                              },
-                                              paramIndex: number
-                                            ) => (
-                                              <li
-                                                key={paramIndex}
-                                                className="text-sm"
-                                              >
-                                                <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">
-                                                  {typeof param.name ===
-                                                  "string"
-                                                    ? param.name
-                                                    : "param"}
-                                                </code>
-                                                <span className="text-gray-500">
-                                                  (
-                                                  {typeof param.type ===
-                                                  "string"
-                                                    ? param.type
-                                                    : "any"}
-                                                  ):{" "}
-                                                  {typeof param.description ===
-                                                  "string"
-                                                    ? param.description
-                                                    : "No description"}
-                                                </span>
-                                              </li>
-                                            )
-                                          )}
-                                        </ul>
-                                      </div>
-                                    )}
-
-                                    {func.returns && (
-                                      <div>
-                                        <h5 className="text-sm font-semibold mb-1">
-                                          Returns:
-                                        </h5>
-                                        <p className="text-sm">
-                                          <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">
-                                            {typeof func.returns?.type ===
-                                            "string"
-                                              ? func.returns.type
-                                              : "void"}
-                                          </code>
-                                          <span className="text-gray-500">
-                                            {" "}
-                                            -
-                                            {typeof func.returns
-                                              ?.description === "string"
-                                              ? func.returns.description
-                                              : "No description"}
-                                          </span>
-                                        </p>
-                                      </div>
-                                    )}
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            {analysis.documentation.functions?.length > 5 && (
-                              <p className="text-sm text-gray-500 text-center">
-                                And{" "}
-                                {analysis.documentation.functions.length - 5}{" "}
-                                more functions...
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {analysis.documentation.mermaidDiagram && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">
-                            Architecture Diagram
-                          </h3>
-                          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded">
-                            <pre className="text-sm">
-                              <MermaidDiagram
-                                chart={analysis.documentation.mermaidDiagram}
-                              />
-                            </pre>
-                          </div>
-                        </div>
-                      )}
-
-                      {analysis.documentation.examples?.length > 0 && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-4">
-                            Usage Examples
-                          </h3>
-                          <div className="space-y-4">
-                            {analysis.documentation.examples.map(
-                              (example, index) => (
-                                <div key={index}>
-                                  <h4 className="font-medium mb-2">
-                                    {typeof example.title === "string"
-                                      ? example.title
-                                      : `Example ${index + 1}`}
-                                  </h4>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                    {typeof example.description === "string"
-                                      ? example.description
-                                      : "No description available"}
-                                  </p>
-                                  <SyntaxHighlighter
-                                    style={oneDark}
-                                    language={
-                                      repository.language?.toLowerCase() ||
-                                      "javascript"
-                                    }
-                                    PreTag="div"
-                                  >
-                                    {typeof example.code === "string"
-                                      ? example.code
-                                      : "// No code available"}
-                                  </SyntaxHighlighter>
-                                  {example.explanation &&
-                                    typeof example.explanation === "string" && (
-                                      <p className="text-sm text-gray-500 mt-2">
-                                        {example.explanation}
-                                      </p>
-                                    )}
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                        <div>
-                          <h4 className="font-semibold mb-2">
-                            Components:{" "}
-                            {analysis.documentation.components?.length || 0}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            React/UI components documented
-                          </p>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold mb-2">
-                            APIs: {analysis.documentation.apis?.length || 0}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            API endpoints documented
-                          </p>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold mb-2">
-                            Data Models:{" "}
-                            {analysis.documentation.dataModels?.length || 0}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            Data structures documented
-                          </p>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold mb-2">SDLC Guide</h4>
-                          <p className="text-sm text-gray-600">
-                            Complete development lifecycle
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      Enhanced Documentation Ready
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Generate comprehensive documentation with code internals,
-                      SDLC guide, and folder structure
-                    </p>
-                    <div className="flex justify-center space-x-2">
-                      <Button
-                        onClick={generateDocumentation}
-                        disabled={generatingDocs}
-                      >
-                        {generatingDocs
-                          ? "Generating..."
-                          : "Generate Enhanced Documentation"}
-                      </Button>
-                      {/* Show Store button if ANY analysis data exists */}
-                      {(analysis.structure ||
-                        analysis.codeAnalysis ||
-                        analysis.documentation ||
-                        analysis.testCases) && (
-                        <Button
-                          onClick={storeAnalysis}
-                          variant="outline"
-                          className="bg-green-600 hover:bg-green-700 text-white border-green-600"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Store All Data
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="tests">
-            {analysis.testCases ? (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Generated Test Cases</span>
-                      <Button
-                        onClick={storeAnalysis}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Store All Data
-                      </Button>
-                    </CardTitle>
-                    <CardDescription>
-                      Generated using{" "}
-                      {typeof analysis.testCases.framework === "string"
-                        ? analysis.testCases.framework
-                        : "Unknown framework"}{" "}
-                      - Estimated Coverage:{" "}
-                      {typeof analysis.testCases.coverage === "number"
-                        ? analysis.testCases.coverage
-                        : 0}
-                      %
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="mb-4">
-                      <Progress
-                        value={
-                          typeof analysis.testCases.coverage === "number"
-                            ? analysis.testCases.coverage
-                            : 0
-                        }
-                      />
-                    </div>
-                    <div className="space-y-4">
-                      {analysis.testCases.testCases?.map((testCase, index) => (
-                        <Card key={index}>
-                          <CardContent className="pt-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-semibold">
-                                {typeof testCase.name === "string"
-                                  ? testCase.name
-                                  : "Unnamed Test"}
-                              </h4>
-                              <div className="flex space-x-2">
-                                <Badge
-                                  variant={
-                                    testCase.type === "unit"
-                                      ? "default"
-                                      : testCase.type === "integration"
-                                      ? "secondary"
-                                      : "outline"
-                                  }
-                                >
-                                  {typeof testCase.type === "string"
-                                    ? testCase.type
-                                    : "unknown"}
-                                </Badge>
-                                <Badge
-                                  variant={
-                                    testCase.priority === "high"
-                                      ? "destructive"
-                                      : testCase.priority === "medium"
-                                      ? "default"
-                                      : "secondary"
-                                  }
-                                >
-                                  {typeof testCase.priority === "string"
-                                    ? testCase.priority
-                                    : "medium"}
-                                </Badge>
-                              </div>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                              {typeof testCase.description === "string"
-                                ? testCase.description
-                                : "No description available"}
-                            </p>
-                            <SyntaxHighlighter
-                              style={oneDark}
-                              language={
-                                repository.language?.toLowerCase() ||
-                                "javascript"
-                              }
-                              PreTag="div"
-                            >
-                              {typeof testCase.code === "string"
-                                ? testCase.code
-                                : "// No code available"}
-                            </SyntaxHighlighter>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <TestTube className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No Test Cases Generated
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Generate AI-powered test cases for this repository
-                    </p>
-                    <div className="flex justify-center space-x-2">
-                      <Button
-                        onClick={generateTestCases}
-                        disabled={generatingTests}
-                      >
-                        {generatingTests
-                          ? "Generating..."
-                          : "Generate Test Cases"}
-                      </Button>
-                      {/* Show Store button if ANY analysis data exists */}
-                      {(analysis.structure ||
-                        analysis.codeAnalysis ||
-                        analysis.documentation ||
-                        analysis.testCases) && (
-                        <Button
-                          onClick={storeAnalysis}
-                          variant="outline"
-                          className="bg-green-600 hover:bg-green-700 text-white border-green-600"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Store All Data
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="commits">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Git History</CardTitle>
-                <CardDescription>
-                  Latest commits and changes to this repository
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {commits.map((commit, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start space-x-3 p-3 border rounded-lg"
-                    >
-                      <GitCommit className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {commit.commit.message.split("\n")[0]}
-                        </p>
-                        <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
-                          <span className="flex items-center">
-                            <Users className="w-3 h-3 mr-1" />
-                            {commit.commit.author.name}
-                          </span>
-                          <span className="flex items-center">
-                            <Clock className="w-3 h-3 mr-1" />
-                            {formatDate(commit.commit.author.date)}
-                          </span>
-                          <span className="font-mono">
-                            {commit.sha.substring(0, 7)}
-                          </span>
-                          <a
-                            href={commit.html_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline"
-                          >
-                            View on GitHub
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {commits.length === 0 && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      <GitCommit className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg mb-2">No commits found</p>
-                      <p className="text-sm">
-                        Unable to fetch commit history for this repository.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

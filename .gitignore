@@ -38,3 +38,4 @@ out-tsc-prod
 .env.test.local
 .env.production.local
 drizzle/
+old.bak
