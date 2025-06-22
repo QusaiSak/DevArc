@@ -1,13 +1,17 @@
-const { db } = require('./client');
-const { users } = require('./schema');
-const { eq } = require('drizzle-orm');
+const { db } = require("./client");
+const { users } = require("./schema");
+const { eq } = require("drizzle-orm");
 
 async function createOrUpdateUser(githubUser) {
-  const existingUser = await db.select().from(users).where(eq(users.githubId, githubUser.id));
-  
+  const existingUser = await db
+    .select()
+    .from(users)
+    .where(eq(users.githubId, githubUser.id));
+
   if (existingUser.length > 0) {
     // Update existing user
-    const [updatedUser] = await db.update(users)
+    const [updatedUser] = await db
+      .update(users)
       .set({
         username: githubUser.login,
         email: githubUser.email,
@@ -21,14 +25,17 @@ async function createOrUpdateUser(githubUser) {
     return updatedUser;
   } else {
     // Create new user
-    const [newUser] = await db.insert(users).values({
-      githubId: githubUser.id,
-      username: githubUser.login,
-      email: githubUser.email,
-      name: githubUser.name,
-      avatarUrl: githubUser.avatar_url,
-      accessToken: githubUser.access_token,
-    }).returning();
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        githubId: githubUser.id,
+        username: githubUser.login,
+        email: githubUser.email,
+        name: githubUser.name,
+        avatarUrl: githubUser.avatar_url,
+        accessToken: githubUser.access_token,
+      })
+      .returning();
     return newUser;
   }
 }
@@ -39,7 +46,10 @@ async function getUserById(id) {
 }
 
 async function getUserByGithubId(githubId) {
-  const [user] = await db.select().from(users).where(eq(users.githubId, githubId));
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.githubId, githubId));
   return user;
 }
 

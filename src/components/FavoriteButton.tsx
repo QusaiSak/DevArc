@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Heart } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from "sonner"
-import { useAuth } from '@/context/AuthContext';
-import { addFavorite, removeFavorite, isFavorite as isFavoriteApi } from '@/lib/favoritesService';
+import React, { useState, useEffect } from "react";
+import { Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
+import {
+  addFavorite,
+  removeFavorite,
+  isFavorite as isFavoriteApi,
+} from "@/lib/favoritesService";
 
 interface FavoriteButtonProps {
   repository: any;
@@ -11,10 +15,10 @@ interface FavoriteButtonProps {
   onFavoriteChange?: () => void; // Add callback to notify parent of changes
 }
 
-export const FavoriteButton: React.FC<FavoriteButtonProps> = ({ 
-  repository, 
+export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
+  repository,
   className = "",
-  onFavoriteChange
+  onFavoriteChange,
 }) => {
   const { user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -60,7 +64,7 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
       // Notify parent component of the change
       onFavoriteChange?.();
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      console.error("Error toggling favorite:", error);
       toast("Error", {
         description: "Failed to update favorites. Please try again.",
       });
@@ -75,12 +79,12 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
       size="sm"
       onClick={toggleFavorite}
       disabled={isLoading}
-      className={`${className} ${isFavorite ? 'bg-red-500 hover:bg-red-600' : ''}`}
+      className={`${className} ${
+        isFavorite ? "bg-red-500 hover:bg-red-600" : ""
+      }`}
     >
-      <Heart 
-        className={`h-4 w-4 mr-1 ${isFavorite ? 'fill-current' : ''}`} 
-      />
-      {isFavorite ? 'Favorited' : 'Add to Favorites'}
+      <Heart className={`h-4 w-4 mr-1 ${isFavorite ? "fill-current" : ""}`} />
+      {isFavorite ? "Favorited" : "Add to Favorites"}
     </Button>
   );
 };

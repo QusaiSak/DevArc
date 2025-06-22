@@ -1,12 +1,27 @@
-import { useAuth } from '@/context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Search, TrendingUp, GitBranch, BookOpen, FileCode, Star, TestTube, Clock } from 'lucide-react';
-import { getFavorites } from '@/lib/favoritesService';
-import { getAllUserAnalyses } from '@/lib/analysesService';
-import { FavoritesList } from '@/components/FavoritesList';
+import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Search,
+  TrendingUp,
+  GitBranch,
+  BookOpen,
+  FileCode,
+  Star,
+  TestTube,
+  Clock,
+} from "lucide-react";
+import { getFavorites } from "@/lib/favoritesService";
+import { getAllUserAnalyses } from "@/lib/analysesService";
+import { FavoritesList } from "@/components/FavoritesList";
 
 interface Analysis {
   testCases?: { testCases?: any[] };
@@ -16,7 +31,11 @@ interface Analysis {
   summary?: string;
   savedAt?: string;
   createdAt?: string;
-  structure?: { totalFiles?: number; totalLines?: number; languages?: Record<string, number> };
+  structure?: {
+    totalFiles?: number;
+    totalLines?: number;
+    languages?: Record<string, number>;
+  };
 }
 
 export default function Dashboard1() {
@@ -41,47 +60,49 @@ export default function Dashboard1() {
 
   const loadUserData = async () => {
     if (!user?.id) return;
-    
+
     try {
       const [analysesResponse, favoritesResponse] = await Promise.all([
         getAllUserAnalyses(user.id),
-        getFavorites(user.id)
+        getFavorites(user.id),
       ]);
-      
+
       const analyses = analysesResponse || [];
       const favorites = favoritesResponse.favorites || [];
-      
+
       setRecentAnalyses(analyses.slice(0, 5)); // Show latest 5
       setStats({
         totalAnalyses: analyses.length,
         totalFavorites: favorites.length,
-        totalTestCases: analyses.reduce((total: number, analysis: Analysis) =>
-          total + (analysis.testCases?.testCases?.length || 0), 0
+        totalTestCases: analyses.reduce(
+          (total: number, analysis: Analysis) =>
+            total + (analysis.testCases?.testCases?.length || 0),
+          0
         ),
       });
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error("Error loading user data:", error);
       setRecentAnalyses([]);
       setStats({ totalAnalyses: 0, totalFavorites: 0, totalTestCases: 0 });
     }
   };
 
   const navigateToSearch = () => {
-    navigate('/search');
+    navigate("/search");
   };
 
   const navigateToAnalysis = (projectId: string) => {
-    const [owner, repo] = projectId.split('/');
+    const [owner, repo] = projectId.split("/");
     navigate(`/repository/${owner}/${repo}`);
   };
 
   // Reload favorites when they change
   const handleFavoriteChange = () => {
-    setReloadKey(k => k + 1);
+    setReloadKey((k) => k + 1);
   };
 
   // Use user.name or user.email for displayName
-  const displayName = user?.username || user?.email || 'Developer';
+  const displayName = user?.username || user?.email || "Developer";
 
   return (
     <div className="mx-auto px-4 py-8 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-black min-h-screen">
@@ -98,7 +119,9 @@ export default function Dashboard1() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Analyses</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Analyses
+            </CardTitle>
             <FileCode className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -146,33 +169,33 @@ export default function Dashboard1() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button 
+            <Button
               onClick={navigateToSearch}
               className="flex flex-col items-center gap-2 h-auto py-4"
             >
               <Search className="h-6 w-6" />
               <span>Search Repositories</span>
             </Button>
-            <Button 
+            <Button
               variant="outline"
               className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => navigate('/search?tab=trending')}
+              onClick={() => navigate("/search?tab=trending")}
             >
               <TrendingUp className="h-6 w-6" />
               <span>Trending Repos</span>
             </Button>
-            <Button 
+            <Button
               variant="outline"
               className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => navigate('/search?tab=popular')}
+              onClick={() => navigate("/search?tab=popular")}
             >
               <GitBranch className="h-6 w-6" />
               <span>Popular Projects</span>
             </Button>
-            <Button 
+            <Button
               variant="outline"
               className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => navigate('/documentation')}
+              onClick={() => navigate("/documentation")}
             >
               <BookOpen className="h-6 w-6" />
               <span>Documentation</span>
@@ -200,7 +223,9 @@ export default function Dashboard1() {
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <FileCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>No analyses yet</p>
-                <p className="text-sm">Start by searching for a repository to analyze</p>
+                <p className="text-sm">
+                  Start by searching for a repository to analyze
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -208,20 +233,30 @@ export default function Dashboard1() {
                   <div
                     key={`${analysis.projectId}-${index}`}
                     className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-                    onClick={() => analysis.projectId && navigateToAnalysis(analysis.projectId)}
+                    onClick={() =>
+                      analysis.projectId &&
+                      navigateToAnalysis(analysis.projectId)
+                    }
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">{analysis.projectName || analysis.projectId}</h3>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          {analysis.projectName || analysis.projectId}
+                        </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-300">
-                          Analyzed {analysis.createdAt ? new Date(analysis.createdAt).toLocaleDateString() : ''}
+                          Analyzed{" "}
+                          {analysis.createdAt
+                            ? new Date(analysis.createdAt).toLocaleDateString()
+                            : ""}
                         </p>
                         {analysis.structure && (
                           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-1">
                             <span>{analysis.structure.totalFiles} files</span>
                             <span>{analysis.structure.totalLines} lines</span>
                             {analysis.structure.languages && (
-                              <span>{Object.keys(analysis.structure.languages)[0]}</span>
+                              <span>
+                                {Object.keys(analysis.structure.languages)[0]}
+                              </span>
                             )}
                           </div>
                         )}

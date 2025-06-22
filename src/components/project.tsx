@@ -1,58 +1,64 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   FolderOpen,
   GitBranch,
   Calendar,
   ExternalLink,
-  Eye
-} from 'lucide-react'
-import { Button } from './ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Badge } from './ui/badge'
-import { RepoImportModal } from './repoModal'
-import { getAllUserProjects } from '@/lib/projectService'
-import type { Repository } from '@/types/github.interface'
-import type { Project } from '@/types/project.interface'
+  Eye,
+} from "lucide-react";
+import { Button } from "./ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Badge } from "./ui/badge";
+import { RepoImportModal } from "./repoModal";
+import { getAllUserProjects } from "@/lib/projectService";
+import type { Repository } from "@/types/github.interface";
+import type { Project } from "@/types/project.interface";
 
 export const Dashboard = () => {
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [recentProjects, setRecentProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-  const navigate = useNavigate()
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [recentProjects, setRecentProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    loadRecentProjects()
-  }, [])
+    loadRecentProjects();
+  }, []);
 
   const loadRecentProjects = async () => {
     try {
-      const projects = await getAllUserProjects()
+      const projects = await getAllUserProjects();
       // Get the 3 most recent projects
-      setRecentProjects(projects.slice(0, 3))
+      setRecentProjects(projects.slice(0, 3));
     } catch (error) {
-      console.error('Failed to load recent projects:', error)
+      console.error("Failed to load recent projects:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleImportRepository = (repo: Repository) => {
-    console.log('Importing repository:', repo)
-    alert(`Successfully imported ${repo.name}!`)
-  }
+    console.log("Importing repository:", repo);
+    alert(`Successfully imported ${repo.name}!`);
+  };
 
   const handleCreateProject = () => {
-    navigate('/create-project')
-  }
+    navigate("/create-project");
+  };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    })
-  }
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-black">
@@ -79,7 +85,8 @@ export const Dashboard = () => {
                 Create New Project
               </h3>
               <p className="text-gray-600 dark:text-gray-400 max-w-sm">
-                Start from scratch with AI-assisted setup and lifecycle selection
+                Start from scratch with AI-assisted setup and lifecycle
+                selection
               </p>
               <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium"
@@ -122,7 +129,7 @@ export const Dashboard = () => {
             </h2>
             <Button
               variant="outline"
-              onClick={() => navigate('/projects')}
+              onClick={() => navigate("/projects")}
               className="text-sm"
             >
               View All
@@ -145,7 +152,10 @@ export const Dashboard = () => {
           ) : recentProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {recentProjects.map((project) => (
-                <Card key={project.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                <Card
+                  key={project.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                >
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-3">
                       <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1">
@@ -155,25 +165,25 @@ export const Dashboard = () => {
                         {project.visibility}
                       </Badge>
                     </div>
-                    
+
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                       {project.description}
                     </p>
-                    
+
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 text-xs text-gray-500">
                         <Calendar className="w-3 h-3" />
                         {formatDate(project.createdAt)}
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         {project.repoUrl && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={(e) => {
-                              e.stopPropagation()
-                              window.open(project.repoUrl, '_blank')
+                              e.stopPropagation();
+                              window.open(project.repoUrl, "_blank");
                             }}
                             className="h-8 w-8 p-0"
                           >
@@ -221,5 +231,5 @@ export const Dashboard = () => {
         onImport={handleImportRepository}
       />
     </div>
-  )
-}
+  );
+};

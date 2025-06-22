@@ -1,22 +1,28 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { 
-  Loader2, 
-  Rocket, 
-  GitBranch, 
-  Users, 
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Loader2,
+  Rocket,
+  GitBranch,
+  Users,
   Layers,
   Shield,
   Star,
-  AlertCircle
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { useAuth } from '@/context/AuthContext'
-import { AIAnalyzer } from '@/lib/aiService'
-import { createProjectWithGitHubDirect } from '@/lib/projectService'
-import type { ProjectData, SDDProjectInput } from '@/types/ai.interface'
+  AlertCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context/AuthContext";
+import { AIAnalyzer } from "@/lib/aiService";
+import { createProjectWithGitHubDirect } from "@/lib/projectService";
+import type { ProjectData, SDDProjectInput } from "@/types/ai.interface";
 
 const initialFormState: ProjectData = {
   name: "",
@@ -28,78 +34,110 @@ const initialFormState: ProjectData = {
   requirements: "",
   keyFeatures: "",
   riskFactors: "",
-  additionalContext: ""
-}
+  additionalContext: "",
+};
 
 export default function CreateProjectPage() {
-  const [formData, setFormData] = useState<ProjectData>(initialFormState)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [step, setStep] = useState<'form' | 'generating' | 'success'>('form')
-  const [generatedData, setGeneratedData] = useState<any>(null)
-  
-  const { user } = useAuth()
-  const navigate = useNavigate()
+  const [formData, setFormData] = useState<ProjectData>(initialFormState);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<"form" | "generating" | "success">("form");
+  const [generatedData, setGeneratedData] = useState<any>(null);
+
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Auto-redirect effect for success step - MUST be at the top before any conditional returns
   useEffect(() => {
-    if (step === 'success' && generatedData?.project?.id) {
+    if (step === "success" && generatedData?.project?.id) {
       const timer = setTimeout(() => {
-        navigate(`/projects/${generatedData.project.id}`)
-      }, 3000)
-      
-      return () => clearTimeout(timer)
+        navigate(`/projects/${generatedData.project.id}`);
+      }, 3000);
+
+      return () => clearTimeout(timer);
     }
-  }, [step, generatedData, navigate])
+  }, [step, generatedData, navigate]);
 
   const projectTypes = [
-    { value: "Web App", icon: Layers, description: "Frontend/Backend web application" },
+    {
+      value: "Web App",
+      icon: Layers,
+      description: "Frontend/Backend web application",
+    },
     { value: "API", icon: GitBranch, description: "REST/GraphQL API service" },
-    { value: "Mobile App", icon: Rocket, description: "iOS/Android mobile application" },
-    { value: "Desktop App", icon: Shield, description: "Cross-platform desktop application" },
-    { value: "CLI Tool", icon: AlertCircle, description: "Command-line utility" },
-    { value: "Library", icon: Star, description: "Reusable code library/package" }
-  ]
+    {
+      value: "Mobile App",
+      icon: Rocket,
+      description: "iOS/Android mobile application",
+    },
+    {
+      value: "Desktop App",
+      icon: Shield,
+      description: "Cross-platform desktop application",
+    },
+    {
+      value: "CLI Tool",
+      icon: AlertCircle,
+      description: "Command-line utility",
+    },
+    {
+      value: "Library",
+      icon: Star,
+      description: "Reusable code library/package",
+    },
+  ];
 
   const complexityLevels = [
-    { value: "Low", color: "bg-green-100 text-green-800", description: "Simple project with basic features" },
-    { value: "Medium", color: "bg-yellow-100 text-yellow-800", description: "Moderate complexity with multiple features" },
-    { value: "High", color: "bg-red-100 text-red-800", description: "Complex project with advanced requirements" }
-  ]
+    {
+      value: "Low",
+      color: "bg-green-100 text-green-800",
+      description: "Simple project with basic features",
+    },
+    {
+      value: "Medium",
+      color: "bg-yellow-100 text-yellow-800",
+      description: "Moderate complexity with multiple features",
+    },
+    {
+      value: "High",
+      color: "bg-red-100 text-red-800",
+      description: "Complex project with advanced requirements",
+    },
+  ];
 
   const handleInputChange = (field: keyof ProjectData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!user) {
-      setError("Please login to create a project")
-      return
+      setError("Please login to create a project");
+      return;
     }
 
-    setLoading(true)
-    setError(null)
-    setStep('generating')
+    setLoading(true);
+    setError(null);
+    setStep("generating");
 
     try {
-      const aiAnalyzer = new AIAnalyzer()
-      
+      const aiAnalyzer = new AIAnalyzer();
+
       // 1. Get SDLC recommendation
-      console.log("🔄 Getting SDLC recommendation...")
-      const sdlcResult = await aiAnalyzer.generateSDLCRecommendation(formData)
-      
+      console.log("🔄 Getting SDLC recommendation...");
+      const sdlcResult = await aiAnalyzer.generateSDLCRecommendation(formData);
+
       // 2. Generate SDD/README
-      console.log("📝 Generating SDD/README...")
+      console.log("📝 Generating SDD/README...");
       const sddData: SDDProjectInput = {
         ...formData,
         techStack: formData.additionalContext || "To be determined",
-        sdlcModel: sdlcResult.recommended
-      }
-      const sddReadme = await aiAnalyzer.generateSDDReadme(sddData)
+        sdlcModel: sdlcResult.recommended,
+      };
+      const sddReadme = await aiAnalyzer.generateSDDReadme(sddData);
 
       // 3. Create project with GitHub integration using the new service
-      console.log("🚀 Creating project with GitHub integration...")
+      console.log("🚀 Creating project with GitHub integration...");
       const result = await createProjectWithGitHubDirect({
         ...formData,
         sdlc: sdlcResult,
@@ -113,29 +151,31 @@ export default function CreateProjectPage() {
           { question: "Key Features", answer: formData.keyFeatures },
           { question: "Risk Factors", answer: formData.riskFactors },
           { question: "Requirements", answer: formData.requirements },
-          { question: "Additional Context", answer: formData.additionalContext }
+          {
+            question: "Additional Context",
+            answer: formData.additionalContext,
+          },
         ],
-        sddContent: sddReadme
-      })
+        sddContent: sddReadme,
+      });
 
       setGeneratedData({
         sdlc: sdlcResult,
         readme: sddReadme,
         repo: result.repo,
-        project: result.project
-      })
-      setStep('success')
-      
+        project: result.project,
+      });
+      setStep("success");
     } catch (err: any) {
-      console.error("❌ Project creation failed:", err)
-      setError(err.message || "Failed to create project")
-      setStep('form')
+      console.error("❌ Project creation failed:", err);
+      setError(err.message || "Failed to create project");
+      setStep("form");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  if (step === 'generating') {
+  if (step === "generating") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-black flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -155,10 +195,10 @@ export default function CreateProjectPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
-  if (step === 'success') {
+  if (step === "success") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-black py-8">
         <div className="container mx-auto px-4 max-w-4xl">
@@ -167,9 +207,12 @@ export default function CreateProjectPage() {
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Rocket className="h-8 w-8 text-green-600" />
               </div>
-              <CardTitle className="text-2xl">Project Created Successfully!</CardTitle>
+              <CardTitle className="text-2xl">
+                Project Created Successfully!
+              </CardTitle>
               <CardDescription>
-                Your project has been set up with AI-recommended SDLC and comprehensive documentation
+                Your project has been set up with AI-recommended SDLC and
+                comprehensive documentation
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -185,7 +228,7 @@ export default function CreateProjectPage() {
                 </div>
                 <div className="space-y-2">
                   <h4 className="font-semibold">Repository</h4>
-                  <a 
+                  <a
                     href={generatedData?.repo?.html_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -198,28 +241,32 @@ export default function CreateProjectPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="text-center text-sm text-gray-600 mb-4">
                 Redirecting to project view in 3 seconds...
               </div>
-              
+
               <div className="flex gap-4 justify-center">
-                <Button 
-                  onClick={() => window.open(generatedData?.repo?.html_url, '_blank')}
+                <Button
+                  onClick={() =>
+                    window.open(generatedData?.repo?.html_url, "_blank")
+                  }
                   className="flex items-center gap-2"
                 >
                   <GitBranch className="h-4 w-4" />
                   View Repository
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
-                  onClick={() => navigate(`/projects/${generatedData?.project?.id}`)}
+                  onClick={() =>
+                    navigate(`/projects/${generatedData?.project?.id}`)
+                  }
                 >
                   View Project
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate("/dashboard")}
                 >
                   Go to Dashboard
                 </Button>
@@ -228,7 +275,7 @@ export default function CreateProjectPage() {
           </Card>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -237,7 +284,8 @@ export default function CreateProjectPage() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">Create New Project</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Let AI recommend the perfect SDLC and generate comprehensive documentation
+            Let AI recommend the perfect SDLC and generate comprehensive
+            documentation
           </p>
         </div>
 
@@ -253,38 +301,48 @@ export default function CreateProjectPage() {
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Project Name</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Project Name
+                  </label>
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="My Awesome Project"
                     required
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">Project Type</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Project Type
+                  </label>
                   <select
                     value={formData.type}
-                    onChange={(e) => handleInputChange('type', e.target.value)}
+                    onChange={(e) => handleInputChange("type", e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
                     <option value="">Select type...</option>
-                    {projectTypes.map(type => (
-                      <option key={type.value} value={type.value}>{type.value}</option>
+                    {projectTypes.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.value}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1">
+                  Description
+                </label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("description", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={3}
                   placeholder="Describe what your project does..."
@@ -305,40 +363,54 @@ export default function CreateProjectPage() {
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Team Size</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Team Size
+                  </label>
                   <input
                     type="text"
                     value={formData.teamSize}
-                    onChange={(e) => handleInputChange('teamSize', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("teamSize", e.target.value)
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., 1-3 developers"
                     required
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">Timeline</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Timeline
+                  </label>
                   <input
                     type="text"
                     value={formData.timeline}
-                    onChange={(e) => handleInputChange('timeline', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("timeline", e.target.value)
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., 3 months"
                     required
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">Complexity</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Complexity
+                  </label>
                   <select
                     value={formData.complexity}
-                    onChange={(e) => handleInputChange('complexity', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("complexity", e.target.value)
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
                     <option value="">Select complexity...</option>
-                    {complexityLevels.map(level => (
-                      <option key={level.value} value={level.value}>{level.value}</option>
+                    {complexityLevels.map((level) => (
+                      <option key={level.value} value={level.value}>
+                        {level.value}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -356,46 +428,62 @@ export default function CreateProjectPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Key Features</label>
+                <label className="block text-sm font-medium mb-1">
+                  Key Features
+                </label>
                 <textarea
                   value={formData.keyFeatures}
-                  onChange={(e) => handleInputChange('keyFeatures', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("keyFeatures", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={3}
                   placeholder="List the main features and functionality..."
                   required
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-1">Requirements</label>
+                <label className="block text-sm font-medium mb-1">
+                  Requirements
+                </label>
                 <textarea
                   value={formData.requirements}
-                  onChange={(e) => handleInputChange('requirements', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("requirements", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={3}
                   placeholder="e.g., Authentication, Stripe payments, real-time features..."
                   required
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-1">Risk Factors</label>
+                <label className="block text-sm font-medium mb-1">
+                  Risk Factors
+                </label>
                 <textarea
                   value={formData.riskFactors}
-                  onChange={(e) => handleInputChange('riskFactors', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("riskFactors", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
                   placeholder="Potential challenges, dependencies, or risks..."
                   required
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-1">Additional Context</label>
+                <label className="block text-sm font-medium mb-1">
+                  Additional Context
+                </label>
                 <textarea
                   value={formData.additionalContext}
-                  onChange={(e) => handleInputChange('additionalContext', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("additionalContext", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
                   placeholder="Any other relevant information..."
@@ -420,7 +508,7 @@ export default function CreateProjectPage() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate("/dashboard")}
             >
               Cancel
             </Button>
@@ -445,5 +533,5 @@ export default function CreateProjectPage() {
         </form>
       </div>
     </div>
-  )
+  );
 }

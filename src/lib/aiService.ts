@@ -1,6 +1,10 @@
-import type { AiMessage, AiResponseOptions, ProjectData, SDDProjectInput } from "@/types/ai.interface";
-import type { ProjectStructure } from "@/types/codeparser.interface"
-
+import type {
+  AiMessage,
+  AiResponseOptions,
+  ProjectData,
+  SDDProjectInput,
+} from "@/types/ai.interface";
+import type { ProjectStructure } from "@/types/codeparser.interface";
 
 // ✅ Wrap response parsing in a reusable function
 export function parseAiJsonResponse(aiText: string): any {
@@ -22,9 +26,9 @@ export function parseAiJsonResponse(aiText: string): any {
     // Optional: fix any escaped characters (not always needed, but safe)
     sanitized = sanitized
       .replace(/\\"/g, '"') // Unescape quotes
-      .replace(/\\n/g, '')  // Remove newline escapes
-      .replace(/\\r/g, '')  // Remove carriage returns
-      .replace(/^"+|"+$/g, ''); // Trim surrounding quotes if present
+      .replace(/\\n/g, "") // Remove newline escapes
+      .replace(/\\r/g, "") // Remove carriage returns
+      .replace(/^"+|"+$/g, ""); // Trim surrounding quotes if present
 
     // Parse final cleaned string
     return JSON.parse(sanitized);
@@ -79,62 +83,73 @@ export const generateAiResponse = async (
 ): Promise<string> => {
   try {
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-    
-    if (messages.every(msg => msg.role !== "system") && mergedOptions.systemPrompt) {
+
+    if (
+      messages.every((msg) => msg.role !== "system") &&
+      mergedOptions.systemPrompt
+    ) {
       messages = [
         { role: "system", content: mergedOptions.systemPrompt },
-        ...messages
+        ...messages,
       ];
     }
-    
-    console.log("AI Request - Messages:", messages.map(m => ({ role: m.role, contentLength: m.content.length })));
+
+    console.log(
+      "AI Request - Messages:",
+      messages.map((m) => ({ role: m.role, contentLength: m.content.length }))
+    );
     console.log("AI Request - Options:", mergedOptions);
-    
+
     const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
-    
+
     if (!OPENROUTER_API_KEY) {
       console.error("OpenRouter API key not found");
       throw new Error("OpenRouter API key not found");
     }
-    
+
     const requestBody = {
       model: mergedOptions.model,
       messages,
       temperature: mergedOptions.temperature,
-      max_tokens: mergedOptions.maxTokens
+      max_tokens: mergedOptions.maxTokens,
     };
-    
+
     console.log("AI Request Body:", JSON.stringify(requestBody, null, 2));
-    
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": window.location.origin,
-        "X-Title": "DevArc Assistant"
-      },
-      body: JSON.stringify(requestBody)
-    });
-    
+
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "DevArc Assistant",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
     console.log("AI Response Status:", response.status, response.statusText);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI Service Error Response:", errorText);
-      throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
     }
-    
+
     const result = await response.json();
     console.log("AI Response Result:", result);
-    
+
     const content = result.choices?.[0]?.message?.content;
-    
+
     if (!content) {
       console.error("No content in AI response:", result);
       throw new Error("No content received from AI service");
     }
-    
+
     console.log("AI Response Content Length:", content.length);
     return content;
   } catch (error) {
@@ -143,20 +158,17 @@ export const generateAiResponse = async (
   }
 };
 
-
-
 export class AIAnalyzer {
-  async generateSDLCRecommendation(projectData: ProjectData
-   ): Promise<{
-    recommended: string
-    reasoning: string
-    phases: string[]
+  async generateSDLCRecommendation(projectData: ProjectData): Promise<{
+    recommended: string;
+    reasoning: string;
+    phases: string[];
     alternatives: Array<{
-      model: string
-      suitability: number
-      pros: string[]
-      cons: string[]
-    }>
+      model: string;
+      suitability: number;
+      pros: string[];
+      cons: string[];
+    }>;
   }> {
     const prompt = `You are a senior software architect and SDLC strategist.
 
@@ -231,7 +243,9 @@ Generate a decision as if it will directly influence a product development roadm
 `;
 
     try {
-      const response = await generateAiResponse([{ role: "user", content: prompt }]);
+      const response = await generateAiResponse([
+        { role: "user", content: prompt },
+      ]);
       return parseAiJsonResponse(response);
     } catch (error) {
       console.error("AI SDLC analysis failed:", error);
@@ -240,11 +254,11 @@ Generate a decision as if it will directly influence a product development roadm
   }
 
   async analyzeCodeStructure(structure: ProjectStructure): Promise<{
-    qualityScore: number
-    strengths: string[]
-    weaknesses: string[]
-    recommendations: string[]
-    maintainabilityIndex: number
+    qualityScore: number;
+    strengths: string[];
+    weaknesses: string[];
+    recommendations: string[];
+    maintainabilityIndex: number;
   }> {
     const prompt = `You are a senior software engineer and code quality auditor.
 
@@ -298,7 +312,9 @@ Generate your JSON evaluation as if it will be reviewed by a technical lead cond
 `;
 
     try {
-      const response = await generateAiResponse([{ role: "user", content: prompt }]);
+      const response = await generateAiResponse([
+        { role: "user", content: prompt },
+      ]);
       return parseAiJsonResponse(response);
     } catch (error) {
       console.error("AI structure analysis failed:", error);
@@ -306,26 +322,28 @@ Generate your JSON evaluation as if it will be reviewed by a technical lead cond
     }
   }
 
-
   async generateTestCasesFromStructure(
     structure: ProjectStructure,
     language: string,
     repositoryName: string
   ): Promise<{
     testCases: Array<{
-      name: string
-      description: string
-      code: string
-      type: "unit" | "integration" | "e2e"
-      priority: "high" | "medium" | "low"
-      file: string
-    }>
-    coverage: number
-    framework: string
-    summary: string
+      name: string;
+      description: string;
+      code: string;
+      type: "unit" | "integration" | "e2e";
+      priority: "high" | "medium" | "low";
+      file: string;
+    }>;
+    coverage: number;
+    framework: string;
+    summary: string;
   }> {
-    const codeFiles = structure.files.filter(file => 
-      file.content && file.content.trim().length > 10 && this.isCodeFile(file.path)
+    const codeFiles = structure.files.filter(
+      (file) =>
+        file.content &&
+        file.content.trim().length > 10 &&
+        this.isCodeFile(file.path)
     );
 
     if (codeFiles.length === 0) {
@@ -334,11 +352,12 @@ Generate your JSON evaluation as if it will be reviewed by a technical lead cond
 
     const maxFiles = 5;
     const maxFileContentLength = 2000;
-    const selectedFiles = codeFiles.slice(0, maxFiles).map(f => ({
+    const selectedFiles = codeFiles.slice(0, maxFiles).map((f) => ({
       path: f.path,
-      content: f.content.length > maxFileContentLength ? 
-        f.content.substring(0, maxFileContentLength) + '\n...(truncated)' : 
-        f.content
+      content:
+        f.content.length > maxFileContentLength
+          ? f.content.substring(0, maxFileContentLength) + "\n...(truncated)"
+          : f.content,
     }));
 
     let aggregatedContent = `Repository: ${repositoryName}\nLanguage: ${language}\nTotal Files: ${structure.totalFiles}\nTotal Lines: ${structure.totalLines}\n\n`;
@@ -409,7 +428,10 @@ Respond with **ONLY valid JSON** using this structure:
 Treat this as a test plan for a production-grade CI/CD pipeline. Be thorough, precise, and pragmatic.
 `;
     try {
-      const response = await generateAiResponse([{ role: "user", content: prompt }], { maxTokens: 4096 });
+      const response = await generateAiResponse(
+        [{ role: "user", content: prompt }],
+        { maxTokens: 4096 }
+      );
       return parseAiJsonResponse(response);
     } catch (error) {
       console.error("AI test generation from structure failed:", error);
@@ -422,23 +444,30 @@ Treat this as a test plan for a production-grade CI/CD pipeline. Be thorough, pr
     language: string,
     repositoryName: string
   ) {
-    const files = parsedData.files.map(file => ({
+    const files = parsedData.files.map((file) => ({
       path: file.path,
-      content: file.content
+      content: file.content,
     }));
 
-    const validFiles = files.filter(f => f.content && f.content.trim().length > 10);
+    const validFiles = files.filter(
+      (f) => f.content && f.content.trim().length > 10
+    );
     if (validFiles.length === 0) {
-      return this.fallbackComprehensiveDocumentationFromFiles([], language, repositoryName);
+      return this.fallbackComprehensiveDocumentationFromFiles(
+        [],
+        language,
+        repositoryName
+      );
     }
 
     const maxFiles = 6;
     const maxFileContentLength = 2000;
-    const selectedFiles = validFiles.slice(0, maxFiles).map(f => ({
+    const selectedFiles = validFiles.slice(0, maxFiles).map((f) => ({
       path: f.path,
-      content: f.content.length > maxFileContentLength ? 
-        f.content.substring(0, maxFileContentLength) + '\n...(truncated)' : 
-        f.content
+      content:
+        f.content.length > maxFileContentLength
+          ? f.content.substring(0, maxFileContentLength) + "\n...(truncated)"
+          : f.content,
     }));
 
     let aggregatedContent = `Repository: ${repositoryName}\nLanguage: ${language}\n\n`;
@@ -456,7 +485,7 @@ It must be suitable for engineers, architects, QA analysts, and DevOps teams to 
 
 ### Project Details:
 - **Repository**: ${repositoryName}
-- **Files Analyzed**: ${selectedFiles.map(f => f.path).join(', ')}
+- **Files Analyzed**: ${selectedFiles.map((f) => f.path).join(", ")}
 
 \`\`\`${language}
 ${aggregatedContent}
@@ -657,19 +686,31 @@ Treat this like a software design handover for a real engineering team. Be clear
 `;
 
     try {
-      console.log("🚀 Generating comprehensive documentation for:", repositoryName);
-      console.log("📁 Files being analyzed:", selectedFiles.map(f => f.path));
+      console.log(
+        "🚀 Generating comprehensive documentation for:",
+        repositoryName
+      );
+      console.log(
+        "📁 Files being analyzed:",
+        selectedFiles.map((f) => f.path)
+      );
       console.log("📝 Prompt length:", prompt.length);
-      
-      const response = await generateAiResponse([{ role: "user", content: prompt }], { maxTokens: 8192 });
+
+      const response = await generateAiResponse(
+        [{ role: "user", content: prompt }],
+        { maxTokens: 8192 }
+      );
       console.log("✅ AI response received, length:", response.length);
       console.log("🔄 Parsing AI response...");
-      
+
       const parsed = parseAiJsonResponse(response);
 
       // --- ALWAYS use our own folder structure tree formatting ---
       if (parsed.folderStructure) {
-        parsed.folderStructure.tree = createFolderStructureTree(files, repositoryName);
+        parsed.folderStructure.tree = createFolderStructureTree(
+          files,
+          repositoryName
+        );
       }
 
       console.log("✅ Documentation generated successfully!");
@@ -678,14 +719,21 @@ Treat this like a software design handover for a real engineering team. Be clear
         hasTechnologies: !!parsed.architecture?.technologies?.length,
         componentsCount: parsed.components?.length || 0,
         apisCount: parsed.apis?.length || 0,
-        functionsCount: parsed.functions?.length || 0
+        functionsCount: parsed.functions?.length || 0,
       });
-      
+
       return parsed;
     } catch (error) {
-      console.error("❌ AI comprehensive documentation generation failed:", error);
+      console.error(
+        "❌ AI comprehensive documentation generation failed:",
+        error
+      );
       console.log("🔄 Using fallback documentation...");
-      return this.fallbackComprehensiveDocumentationFromFiles(selectedFiles, language, repositoryName);
+      return this.fallbackComprehensiveDocumentationFromFiles(
+        selectedFiles,
+        language,
+        repositoryName
+      );
     }
   }
 
@@ -804,31 +852,44 @@ Generate this entire document based on the provided fields. Adapt the tone for t
 DO NOT wrap the response in JSON or quotes. Return the markdown content directly starting with # ${project.name}
 `;
     try {
-      const response = await generateAiResponse([{ role: "user", content: prompt }], { maxTokens: 8192 });
-      
-      console.log('🔍 AI SDD/README Response Debug:');
-      console.log('- Type:', typeof response);
-      console.log('- Length:', response.length);
-      console.log('- First 300 chars:', response.substring(0, 300));
-      console.log('- Starts with JSON?:', response.trim().startsWith('{'));
-      console.log('- Contains README.md key?:', response.includes('"README.md"'));
-      
+      const response = await generateAiResponse(
+        [{ role: "user", content: prompt }],
+        { maxTokens: 8192 }
+      );
+
+      console.log("🔍 AI SDD/README Response Debug:");
+      console.log("- Type:", typeof response);
+      console.log("- Length:", response.length);
+      console.log("- First 300 chars:", response.substring(0, 300));
+      console.log("- Starts with JSON?:", response.trim().startsWith("{"));
+      console.log(
+        "- Contains README.md key?:",
+        response.includes('"README.md"')
+      );
+
       // Check if the response is JSON-wrapped and extract content if needed
       let cleanResponse = response.trim();
-      
-      if (cleanResponse.startsWith('{') && cleanResponse.includes('"README.md"')) {
-        console.log('⚠️ Detected JSON-wrapped response, extracting markdown content...');
+
+      if (
+        cleanResponse.startsWith("{") &&
+        cleanResponse.includes('"README.md"')
+      ) {
+        console.log(
+          "⚠️ Detected JSON-wrapped response, extracting markdown content..."
+        );
         try {
           const parsed = JSON.parse(cleanResponse);
           if (parsed["README.md"]) {
             cleanResponse = parsed["README.md"];
-            console.log('✅ Successfully extracted markdown from JSON wrapper');
+            console.log("✅ Successfully extracted markdown from JSON wrapper");
           }
         } catch {
-          console.log('❌ Failed to parse JSON wrapper, using original response');
+          console.log(
+            "❌ Failed to parse JSON wrapper, using original response"
+          );
         }
       }
-      
+
       // This is a Markdown document, so just return as string
       return cleanResponse;
     } catch (error) {
@@ -840,13 +901,19 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
   private fallbackSDLCRecommendation(projectData: ProjectData) {
     const complexity = projectData.complexity.toLowerCase();
     const teamSize = parseInt(projectData.teamSize) || 1;
-    
+
     let recommended = "Agile";
     let phases = ["Planning", "Development", "Testing", "Review", "Deployment"];
-    
+
     if (complexity.includes("high") && teamSize > 10) {
       recommended = "Scrum";
-      phases = ["Sprint Planning", "Daily Standups", "Development", "Sprint Review", "Sprint Retrospective"];
+      phases = [
+        "Sprint Planning",
+        "Daily Standups",
+        "Development",
+        "Sprint Review",
+        "Sprint Retrospective",
+      ];
     } else if (complexity.includes("low") && teamSize < 5) {
       recommended = "Kanban";
       phases = ["Backlog", "To Do", "In Progress", "Testing", "Done"];
@@ -861,58 +928,67 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
           model: "Waterfall",
           suitability: 60,
           pros: ["Clear phases", "Well-documented"],
-          cons: ["Less flexible", "Late feedback"]
+          cons: ["Less flexible", "Late feedback"],
         },
         {
           model: "DevOps",
           suitability: 75,
           pros: ["Continuous delivery", "Automation"],
-          cons: ["Complex setup", "Cultural change required"]
-        }
-      ]
+          cons: ["Complex setup", "Cultural change required"],
+        },
+      ],
     };
   }
 
   private fallbackStructureAnalysis(structure: ProjectStructure) {
-    const score = Math.max(30, Math.min(90, 
-      (structure.testCoverage * 0.3) + 
-      (Math.min(structure.complexity.average, 10) * 5) + 
-      (structure.totalFiles > 0 ? 20 : 0)
-    ));
+    const score = Math.max(
+      30,
+      Math.min(
+        90,
+        structure.testCoverage * 0.3 +
+          Math.min(structure.complexity.average, 10) * 5 +
+          (structure.totalFiles > 0 ? 20 : 0)
+      )
+    );
 
     return {
       qualityScore: Math.round(score),
       strengths: [
         `Project contains ${structure.totalFiles} files with ${structure.totalLines} lines of code`,
         `Test coverage at ${structure.testCoverage}%`,
-        `Uses ${structure.patterns.framework.join(", ")} framework`
+        `Uses ${structure.patterns.framework.join(", ")} framework`,
       ],
       weaknesses: [
         structure.testCoverage < 80 ? "Test coverage could be improved" : "",
-        structure.complexity.average > 5 ? "Code complexity is above average" : "",
-        structure.issues.length > 0 ? `${structure.issues.length} issues detected` : ""
+        structure.complexity.average > 5
+          ? "Code complexity is above average"
+          : "",
+        structure.issues.length > 0
+          ? `${structure.issues.length} issues detected`
+          : "",
       ].filter(Boolean),
       recommendations: [
         "Increase test coverage for better reliability",
         "Consider refactoring complex functions",
-        "Add more documentation for maintainability"
+        "Add more documentation for maintainability",
       ],
-      maintainabilityIndex: Math.round(score * 0.8)
+      maintainabilityIndex: Math.round(score * 0.8),
     };
   }
 
   private fallbackTestGeneration(language: string) {
     const frameworks = {
-      javascript: 'Jest',
-      typescript: 'Jest',
-      python: 'pytest',
-      java: 'JUnit',
-      csharp: 'NUnit',
-      go: 'testing',
-      rust: 'cargo test'
+      javascript: "Jest",
+      typescript: "Jest",
+      python: "pytest",
+      java: "JUnit",
+      csharp: "NUnit",
+      go: "testing",
+      rust: "cargo test",
     };
 
-    const framework = frameworks[language.toLowerCase() as keyof typeof frameworks] || 'Jest';
+    const framework =
+      frameworks[language.toLowerCase() as keyof typeof frameworks] || "Jest";
 
     return {
       testCases: [
@@ -921,33 +997,37 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
           description: `Basic test for ${language} file (AI unavailable)`,
           code: `// ${framework} test template\n// Add your test implementation here`,
           type: "unit" as const,
-          priority: "medium" as const
+          priority: "medium" as const,
         },
         {
           name: "Error Handling Test",
           description: "Test error conditions and edge cases",
           code: `// Test error scenarios\n// Verify proper error handling`,
           type: "unit" as const,
-          priority: "high" as const
-        }
+          priority: "high" as const,
+        },
       ],
       coverage: 75,
-      framework
+      framework,
     };
   }
 
-  private fallbackTestGenerationFromStructure(language: string, repositoryName: string) {
+  private fallbackTestGenerationFromStructure(
+    language: string,
+    repositoryName: string
+  ) {
     const frameworks = {
-      javascript: 'Jest',
-      typescript: 'Jest',
-      python: 'pytest',
-      java: 'JUnit',
-      csharp: 'NUnit',
-      go: 'testing',
-      rust: 'cargo test'
+      javascript: "Jest",
+      typescript: "Jest",
+      python: "pytest",
+      java: "JUnit",
+      csharp: "NUnit",
+      go: "testing",
+      rust: "cargo test",
     };
 
-    const framework = frameworks[language.toLowerCase() as keyof typeof frameworks] || 'Jest';
+    const framework =
+      frameworks[language.toLowerCase() as keyof typeof frameworks] || "Jest";
 
     return {
       testCases: [
@@ -957,7 +1037,7 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
           code: `// ${framework} integration test template\n// Test main application flow`,
           type: "integration" as const,
           priority: "high" as const,
-          file: "main application file"
+          file: "main application file",
         },
         {
           name: "Core Functionality Unit Test",
@@ -965,12 +1045,12 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
           code: `// ${framework} unit test template\n// Test individual components`,
           type: "unit" as const,
           priority: "medium" as const,
-          file: "core component files"
-        }
+          file: "core component files",
+        },
       ],
       coverage: 70,
       framework,
-      summary: `Basic test strategy for ${repositoryName} using ${framework}. AI-powered analysis unavailable.`
+      summary: `Basic test strategy for ${repositoryName} using ${framework}. AI-powered analysis unavailable.`,
     };
   }
 
@@ -984,13 +1064,13 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
           parameters: [],
           returns: {
             type: "void",
-            description: "No return value"
-          }
-        }
+            description: "No return value",
+          },
+        },
       ],
       examples: [
-        `// Example usage of ${filePath}\n// Please refer to the actual file for implementation details`
-      ]
+        `// Example usage of ${filePath}\n// Please refer to the actual file for implementation details`,
+      ],
     };
   }
 
@@ -999,194 +1079,230 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
     language: string,
     repositoryName: string
   ) {
-    const fileList = files.length > 0 ? files.map(f => f.path).join(', ') : 'No files available';
+    const fileList =
+      files.length > 0
+        ? files.map((f) => f.path).join(", ")
+        : "No files available";
 
     return {
       summary: `${repositoryName} is a ${language} application. AI-powered analysis is currently unavailable, but the codebase includes the following files: ${fileList}`,
       architecture: {
-        pattern: 'Component-based Architecture',
+        pattern: "Component-based Architecture",
         description: `The application follows a ${language} component-based architecture with clear separation of concerns.`,
-        technologies: [language, 'Modern Development Stack'],
+        technologies: [language, "Modern Development Stack"],
         layers: [
           {
-            name: 'Presentation Layer',
-            description: 'User interface and presentation logic',
-            components: files.filter(f => f.path.includes('component')).map(f => f.path)
+            name: "Presentation Layer",
+            description: "User interface and presentation logic",
+            components: files
+              .filter((f) => f.path.includes("component"))
+              .map((f) => f.path),
           },
           {
-            name: 'Business Logic Layer', 
-            description: 'Core application logic and business rules',
-            components: files.filter(f => f.path.includes('service') || f.path.includes('lib')).map(f => f.path)
+            name: "Business Logic Layer",
+            description: "Core application logic and business rules",
+            components: files
+              .filter(
+                (f) => f.path.includes("service") || f.path.includes("lib")
+              )
+              .map((f) => f.path),
           },
           {
-            name: 'Data Layer',
-            description: 'Data access and management',
-            components: files.filter(f => f.path.includes('model') || f.path.includes('interface')).map(f => f.path)
-          }
-        ]
+            name: "Data Layer",
+            description: "Data access and management",
+            components: files
+              .filter(
+                (f) => f.path.includes("model") || f.path.includes("interface")
+              )
+              .map((f) => f.path),
+          },
+        ],
       },
       folderStructure: {
         tree: createFolderStructureTree(files, repositoryName),
         directories: [
           {
-            path: 'src/',
-            purpose: 'Main source code directory',
-            type: 'source' as const,
-            fileCount: files.filter(f => f.path.startsWith('src/')).length,
-            description: 'Contains the main application source code including components, services, and utilities'
-          }
-        ]
+            path: "src/",
+            purpose: "Main source code directory",
+            type: "source" as const,
+            fileCount: files.filter((f) => f.path.startsWith("src/")).length,
+            description:
+              "Contains the main application source code including components, services, and utilities",
+          },
+        ],
       },
       codeInternals: {
         codeFlow: `The application follows a standard ${language} execution flow with initialization, main processing, and cleanup phases.`,
         keyAlgorithms: [
           {
-            name: 'Standard Processing',
-            description: 'Basic application processing logic',
-            file: 'main application file',
-            complexity: 'O(n)',
-            implementation: 'Standard implementation patterns'
-          }
+            name: "Standard Processing",
+            description: "Basic application processing logic",
+            file: "main application file",
+            complexity: "O(n)",
+            implementation: "Standard implementation patterns",
+          },
         ],
         designPatterns: [
           {
-            pattern: 'Module Pattern',
-            usage: 'Used for organizing code into reusable modules',
-            files: files.map(f => f.path),
-            description: 'Better code organization and maintainability'
-          }
+            pattern: "Module Pattern",
+            usage: "Used for organizing code into reusable modules",
+            files: files.map((f) => f.path),
+            description: "Better code organization and maintainability",
+          },
         ],
-        dataFlow: 'Data flows from input through processing layers to output with validation at each stage',
+        dataFlow:
+          "Data flows from input through processing layers to output with validation at each stage",
         businessLogic: [
           {
-            module: 'Core Application',
-            purpose: 'Main application functionality',
-            workflow: 'Standard processing workflow',
-            files: files.map(f => f.path)
-          }
-        ]
+            module: "Core Application",
+            purpose: "Main application functionality",
+            workflow: "Standard processing workflow",
+            files: files.map((f) => f.path),
+          },
+        ],
       },
       sdlc: {
-        developmentWorkflow: 'Standard development workflow with version control, code review, and continuous integration',
+        developmentWorkflow:
+          "Standard development workflow with version control, code review, and continuous integration",
         setupInstructions: [
           {
             step: 1,
-            title: 'Clone Repository',
-            description: 'Clone the repository to your local machine',
-            commands: ['git clone <repository-url>']
+            title: "Clone Repository",
+            description: "Clone the repository to your local machine",
+            commands: ["git clone <repository-url>"],
           },
           {
             step: 2,
-            title: 'Install Dependencies',
-            description: 'Install project dependencies',
-            commands: ['npm install', 'yarn install']
-          }
+            title: "Install Dependencies",
+            description: "Install project dependencies",
+            commands: ["npm install", "yarn install"],
+          },
         ],
         buildProcess: {
           description: `Standard ${language} build process`,
-          steps: ['Install dependencies', 'Run build command', 'Generate output'],
-          tools: ['Package manager', 'Build tools', 'Bundler']
+          steps: [
+            "Install dependencies",
+            "Run build command",
+            "Generate output",
+          ],
+          tools: ["Package manager", "Build tools", "Bundler"],
         },
         testingStrategy: {
-          approach: 'Unit testing with integration tests',
-          testTypes: ['unit', 'integration', 'e2e'],
-          coverage: 'Target 80%+ code coverage',
-          frameworks: ['Standard testing framework']
+          approach: "Unit testing with integration tests",
+          testTypes: ["unit", "integration", "e2e"],
+          coverage: "Target 80%+ code coverage",
+          frameworks: ["Standard testing framework"],
         },
         deploymentGuide: {
-          process: 'Automated deployment through CI/CD pipeline',
-          environments: ['development', 'staging', 'production'],
+          process: "Automated deployment through CI/CD pipeline",
+          environments: ["development", "staging", "production"],
           steps: [
             {
-              environment: 'development',
-              steps: ['Build application', 'Run tests', 'Deploy to dev environment']
-            }
-          ]
+              environment: "development",
+              steps: [
+                "Build application",
+                "Run tests",
+                "Deploy to dev environment",
+              ],
+            },
+          ],
         },
         maintenance: {
-          guidelines: ['Regular code reviews', 'Keep dependencies updated', 'Monitor performance'],
-          monitoring: ['Application logs', 'Performance metrics', 'Error tracking'],
+          guidelines: [
+            "Regular code reviews",
+            "Keep dependencies updated",
+            "Monitor performance",
+          ],
+          monitoring: [
+            "Application logs",
+            "Performance metrics",
+            "Error tracking",
+          ],
           troubleshooting: [
             {
-              issue: 'Application not starting',
-              solution: 'Check logs for errors and verify environment configuration'
-            }
-          ]
-        }
+              issue: "Application not starting",
+              solution:
+                "Check logs for errors and verify environment configuration",
+            },
+          ],
+        },
       },
-      components: files.map(f => ({
-        name: f.path.split('/').pop() || f.path,
-        type: f.path.includes('component') ? 'Component' : 'File',
+      components: files.map((f) => ({
+        name: f.path.split("/").pop() || f.path,
+        type: f.path.includes("component") ? "Component" : "File",
         file: f.path,
-        description: 'Component/file in the codebase',
+        description: "Component/file in the codebase",
         dependencies: [] as string[],
         exports: [] as string[],
         internals: {
-          purpose: 'Core application functionality',
-          keyMethods: ['main', 'init', 'process'],
-          stateManagement: 'Local state management',
-          lifecycle: 'Standard lifecycle'
-        }
+          purpose: "Core application functionality",
+          keyMethods: ["main", "init", "process"],
+          stateManagement: "Local state management",
+          lifecycle: "Standard lifecycle",
+        },
       })),
       apis: [
         {
-          endpoint: '/api/health',
-          method: 'GET',
-          description: 'Health check endpoint',
+          endpoint: "/api/health",
+          method: "GET",
+          description: "Health check endpoint",
           parameters: [],
           response: '{ "status": "ok" }',
           internals: {
-            implementation: 'Health controller',
-            validation: 'Basic validation',
-            errorHandling: 'Standard error handling',
-            authentication: 'No authentication required'
-          }
-        }
+            implementation: "Health controller",
+            validation: "Basic validation",
+            errorHandling: "Standard error handling",
+            authentication: "No authentication required",
+          },
+        },
       ],
       functions: [
         {
-          name: 'main',
-          file: 'main application file',
-          type: 'function',
-          description: 'Main application entry point',
+          name: "main",
+          file: "main application file",
+          type: "function",
+          description: "Main application entry point",
           parameters: [],
           returns: {
-            type: 'void',
-            description: 'No return value'
+            type: "void",
+            description: "No return value",
           },
           internals: {
-            algorithm: 'Simple initialization and startup',
-            complexity: 'O(1)',
-            sideEffects: 'None',
-            dependencies: []
-          }
-        }
+            algorithm: "Simple initialization and startup",
+            complexity: "O(1)",
+            sideEffects: "None",
+            dependencies: [],
+          },
+        },
       ],
       dataModels: [
         {
-          name: 'ApplicationConfig',
-          type: 'Interface',
-          file: 'config file',
+          name: "ApplicationConfig",
+          type: "Interface",
+          file: "config file",
           properties: [
             {
-              name: 'environment',
-              type: 'string',
-              description: 'Application environment'
-            }
+              name: "environment",
+              type: "string",
+              description: "Application environment",
+            },
           ],
           relationships: [],
-          validation: ['Required field validation']
-        }
+          validation: ["Required field validation"],
+        },
       ],
-      mermaidDiagram: 'graph TD\nA[User] --> B[' + repositoryName + ' Application]\nB --> C[Business Logic]\nC --> D[Data Layer]',
+      mermaidDiagram:
+        "graph TD\nA[User] --> B[" +
+        repositoryName +
+        " Application]\nB --> C[Business Logic]\nC --> D[Data Layer]",
       examples: [
         {
-          title: 'Basic Usage',
-          description: 'How to use the main application',
+          title: "Basic Usage",
+          description: "How to use the main application",
           code: `// Example usage\n// Initialize application\n// Process data\n// Return results`,
-          explanation: 'This shows the basic application flow'
-        }
-      ]
+          explanation: "This shows the basic application flow",
+        },
+      ],
     };
   }
 
@@ -1194,23 +1310,89 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
     if (!filePath) return false;
 
     const excludedExtensions = [
-      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico', '.webp',
-      '.mp4', '.avi', '.mov', '.wmv', '.mp3', '.wav', '.pdf', '.doc',
-      '.zip', '.rar', '.7z', '.tar', '.gz', '.ttf', '.otf', '.woff',
-      '.exe', '.dll', '.so', '.db', '.sqlite', '.log', '.tmp', '.lock', '.map'
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".bmp",
+      ".svg",
+      ".ico",
+      ".webp",
+      ".mp4",
+      ".avi",
+      ".mov",
+      ".wmv",
+      ".mp3",
+      ".wav",
+      ".pdf",
+      ".doc",
+      ".zip",
+      ".rar",
+      ".7z",
+      ".tar",
+      ".gz",
+      ".ttf",
+      ".otf",
+      ".woff",
+      ".exe",
+      ".dll",
+      ".so",
+      ".db",
+      ".sqlite",
+      ".log",
+      ".tmp",
+      ".lock",
+      ".map",
     ];
 
     const excludedDirectories = [
-      'node_modules/', 'dist/', 'build/', 'target/', 'bin/', 'obj/',
-      '.git/', '.vscode/', '.idea/', '__pycache__/', 'coverage/',
-      'vendor/', 'assets/images/', 'static/images/', 'images/', 'img/'
+      "node_modules/",
+      "dist/",
+      "build/",
+      "target/",
+      "bin/",
+      "obj/",
+      ".git/",
+      ".vscode/",
+      ".idea/",
+      "__pycache__/",
+      "coverage/",
+      "vendor/",
+      "assets/images/",
+      "static/images/",
+      "images/",
+      "img/",
     ];
 
     const codeExtensions = [
-      '.js', '.ts', '.jsx', '.tsx', '.vue', '.svelte', '.html', '.css',
-      '.scss', '.sass', '.py', '.java', '.c', '.cpp', '.cs', '.php',
-      '.rb', '.go', '.rs', '.kt', '.swift', '.sh', '.json', '.yaml',
-      '.yml', '.xml', '.md', '.txt'
+      ".js",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".vue",
+      ".svelte",
+      ".html",
+      ".css",
+      ".scss",
+      ".sass",
+      ".py",
+      ".java",
+      ".c",
+      ".cpp",
+      ".cs",
+      ".php",
+      ".rb",
+      ".go",
+      ".rs",
+      ".kt",
+      ".swift",
+      ".sh",
+      ".json",
+      ".yaml",
+      ".yml",
+      ".xml",
+      ".md",
+      ".txt",
     ];
 
     const lowerPath = filePath.toLowerCase();
@@ -1231,7 +1413,10 @@ DO NOT wrap the response in JSON or quotes. Return the markdown content directly
 }
 
 // Utility function to create a properly formatted folder structure tree
-function createFolderStructureTree(files: Array<{ path: string; content: string }>, repositoryName: string): string {
+function createFolderStructureTree(
+  files: Array<{ path: string; content: string }>,
+  repositoryName: string
+): string {
   if (!files || files.length === 0) {
     return `${repositoryName}/\n└── (empty)`;
   }
@@ -1240,20 +1425,20 @@ function createFolderStructureTree(files: Array<{ path: string; content: string 
   const structure: Record<string, string[]> = {};
   const directories = new Set<string>();
 
-  files.forEach(file => {
-    const parts = file.path.split('/');
-    let currentPath = '';
-    
+  files.forEach((file) => {
+    const parts = file.path.split("/");
+    let currentPath = "";
+
     // Add all directory levels
     for (let i = 0; i < parts.length - 1; i++) {
       currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
       directories.add(currentPath);
     }
-    
+
     // Add file to its directory
-    const dir = parts.slice(0, -1).join('/') || '.';
+    const dir = parts.slice(0, -1).join("/") || ".";
     const fileName = parts[parts.length - 1];
-    
+
     if (!structure[dir]) {
       structure[dir] = [];
     }
@@ -1262,41 +1447,47 @@ function createFolderStructureTree(files: Array<{ path: string; content: string 
 
   // Sort directories and files
   const sortedDirs = Array.from(directories).sort();
-  Object.keys(structure).forEach(dir => {
+  Object.keys(structure).forEach((dir) => {
     structure[dir].sort();
   });
 
   // Build tree string
   let tree = `${repositoryName}/\n`;
-  const allPaths = [...sortedDirs, ...Object.keys(structure).filter(dir => dir !== '.')];
+  const allPaths = [
+    ...sortedDirs,
+    ...Object.keys(structure).filter((dir) => dir !== "."),
+  ];
   const uniquePaths = [...new Set(allPaths)].sort();
 
   // Add root files first
-  if (structure['.']) {
-    structure['.'].forEach((file, index) => {
-      const isLast = index === structure['.'].length - 1 && uniquePaths.length === 0;
-      tree += `${isLast ? '└── ' : '├── '}${file}\n`;
+  if (structure["."]) {
+    structure["."].forEach((file, index) => {
+      const isLast =
+        index === structure["."].length - 1 && uniquePaths.length === 0;
+      tree += `${isLast ? "└── " : "├── "}${file}\n`;
     });
   }
 
   // Add directories and their contents
   uniquePaths.forEach((path, pathIndex) => {
-    if (path === '.') return;
-    
+    if (path === ".") return;
+
     const isLastPath = pathIndex === uniquePaths.length - 1;
-    const depth = path.split('/').length;
-    const indent = '│   '.repeat(depth - 1);
-    const connector = isLastPath ? '└── ' : '├── ';
-    const dirName = path.split('/').pop();
-    
+    const depth = path.split("/").length;
+    const indent = "│   ".repeat(depth - 1);
+    const connector = isLastPath ? "└── " : "├── ";
+    const dirName = path.split("/").pop();
+
     tree += `${indent}${connector}${dirName}/\n`;
-    
+
     // Add files in this directory
     if (structure[path]) {
       structure[path].forEach((file, fileIndex) => {
         const isLastFile = fileIndex === structure[path].length - 1;
-        const fileIndent = isLastPath ? '    '.repeat(depth) : '│   '.repeat(depth);
-        const fileConnector = isLastFile ? '└── ' : '├── ';
+        const fileIndent = isLastPath
+          ? "    ".repeat(depth)
+          : "│   ".repeat(depth);
+        const fileConnector = isLastFile ? "└── " : "├── ";
         tree += `${fileIndent}${fileConnector}${file}\n`;
       });
     }

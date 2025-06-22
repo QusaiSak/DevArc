@@ -56,16 +56,16 @@ export interface Project {
   visibility: string;
   createdAt: string;
   updatedAt: string;
-    repoUrl?: string;
-    type?: string;
-    teamSize?: string;
-    timeline?: string;
-    complexity?: string;
-    techStack?: string;
-    keyFeatures?: string;
-    riskFactors?: string;
-    requirements?: string;
-    additionalContext?: string;
+  repoUrl?: string;
+  type?: string;
+  teamSize?: string;
+  timeline?: string;
+  complexity?: string;
+  techStack?: string;
+  keyFeatures?: string;
+  riskFactors?: string;
+  requirements?: string;
+  additionalContext?: string;
 }
 
 export interface ProjectStats {

@@ -1,5 +1,5 @@
-const express = require('express');
-const jwt = require('jsonwebtoken');
+const express = require("express");
+const jwt = require("jsonwebtoken");
 const {
   createProject,
   getUserProjects,
@@ -8,8 +8,8 @@ const {
   deleteProject,
   getProjectsByVisibility,
   searchUserProjects,
-  getProjectStats
-} = require('../db/project');
+  getProjectStats,
+} = require("../db/project");
 
 const router = express.Router();
 
@@ -17,23 +17,26 @@ const router = express.Router();
 const authenticate = (req, res, next) => {
   const token = req.cookies.auth_token;
   if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' });
+    return res.status(401).json({ error: "Not authenticated" });
   }
-  
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "your-jwt-secret"
+    );
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: "Invalid token" });
   }
 };
 
 // GET /api/projects - Get all user's projects
-router.get('/', authenticate, async (req, res) => {
+router.get("/", authenticate, async (req, res) => {
   try {
     const { visibility, search } = req.query;
-    
+
     let projects;
     if (search) {
       projects = await searchUserProjects(req.user.dbId, search);
@@ -45,39 +48,37 @@ router.get('/', authenticate, async (req, res) => {
 
     res.json({
       success: true,
-      projects
+      projects,
     });
-
   } catch (error) {
-    console.error('❌ Error fetching projects:', error);
+    console.error("❌ Error fetching projects:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch projects'
+      error: error.message || "Failed to fetch projects",
     });
   }
 });
 
 // GET /api/projects/stats - Get project statistics
-router.get('/stats', authenticate, async (req, res) => {
+router.get("/stats", authenticate, async (req, res) => {
   try {
     const stats = await getProjectStats(req.user.dbId);
 
     res.json({
       success: true,
-      stats
+      stats,
     });
-
   } catch (error) {
-    console.error('❌ Error fetching project stats:', error);
+    console.error("❌ Error fetching project stats:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch project statistics'
+      error: error.message || "Failed to fetch project statistics",
     });
   }
 });
 
 // GET /api/projects/:id - Get specific project
-router.get('/:id', authenticate, async (req, res) => {
+router.get("/:id", authenticate, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id);
     const project = await getProjectById(projectId, req.user.dbId);
@@ -85,30 +86,29 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        error: 'Project not found'
+        error: "Project not found",
       });
     }
 
     res.json({
       success: true,
-      project
+      project,
     });
-
   } catch (error) {
-    console.error('❌ Error fetching project:', error);
+    console.error("❌ Error fetching project:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch project'
+      error: error.message || "Failed to fetch project",
     });
   }
 });
 
 // POST /api/projects - Create new project
-router.post('/', authenticate, async (req, res) => {
+router.post("/", authenticate, async (req, res) => {
   try {
-    console.log('📥 Received project creation request');
-    console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
-    
+    console.log("📥 Received project creation request");
+    console.log("📋 Request body:", JSON.stringify(req.body, null, 2));
+
     const {
       name,
       description,
@@ -125,35 +125,35 @@ router.post('/', authenticate, async (req, res) => {
       questions,
       repoUrl,
       tags,
-      visibility = 'private'
+      visibility = "private",
     } = req.body;
 
-    console.log('🔍 Extracted data:');
-    console.log('- name:', name);
-    console.log('- description:', description);
-    console.log('- sdlc type:', typeof sdlc);
-    console.log('- sdlc:', JSON.stringify(sdlc, null, 2));
-    console.log('- questions type:', typeof questions);
-    console.log('- questions:', JSON.stringify(questions, null, 2));
+    console.log("🔍 Extracted data:");
+    console.log("- name:", name);
+    console.log("- description:", description);
+    console.log("- sdlc type:", typeof sdlc);
+    console.log("- sdlc:", JSON.stringify(sdlc, null, 2));
+    console.log("- questions type:", typeof questions);
+    console.log("- questions:", JSON.stringify(questions, null, 2));
 
     // Validate required fields
     if (!name || !description) {
-      console.log('❌ Validation failed: missing name or description');
+      console.log("❌ Validation failed: missing name or description");
       return res.status(400).json({
         success: false,
-        error: 'Project name and description are required'
+        error: "Project name and description are required",
       });
     }
 
     if (!sdlc) {
-      console.log('❌ Validation failed: missing SDLC');
+      console.log("❌ Validation failed: missing SDLC");
       return res.status(400).json({
         success: false,
-        error: 'SDLC recommendation is required'
+        error: "SDLC recommendation is required",
       });
     }
 
-    console.log('✅ Validation passed, creating project in database...');
+    console.log("✅ Validation passed, creating project in database...");
 
     // Create project in database
     const newProject = await createProject({
@@ -163,59 +163,61 @@ router.post('/', authenticate, async (req, res) => {
       sdlc,
       questions: questions || [],
       repoUrl: repoUrl || null,
-      tags: tags || '',
-      visibility
+      tags: tags || "",
+      visibility,
     });
 
-    console.log('✅ Project created successfully:', newProject);
+    console.log("✅ Project created successfully:", newProject);
 
     res.json({
       success: true,
       project: newProject,
-      message: 'Project created successfully'
+      message: "Project created successfully",
     });
-
   } catch (error) {
-    console.error('❌ Error creating project:', error);
+    console.error("❌ Error creating project:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to create project'
+      error: error.message || "Failed to create project",
     });
   }
 });
 
 // PUT /api/projects/:id - Update project
-router.put('/:id', authenticate, async (req, res) => {
+router.put("/:id", authenticate, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id);
     const updateData = req.body;
 
-    const updatedProject = await updateProject(projectId, req.user.dbId, updateData);
+    const updatedProject = await updateProject(
+      projectId,
+      req.user.dbId,
+      updateData
+    );
 
     if (!updatedProject) {
       return res.status(404).json({
         success: false,
-        error: 'Project not found'
+        error: "Project not found",
       });
     }
 
     res.json({
       success: true,
       project: updatedProject,
-      message: 'Project updated successfully'
+      message: "Project updated successfully",
     });
-
   } catch (error) {
-    console.error('❌ Error updating project:', error);
+    console.error("❌ Error updating project:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to update project'
+      error: error.message || "Failed to update project",
     });
   }
 });
 
 // DELETE /api/projects/:id - Delete project
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete("/:id", authenticate, async (req, res) => {
   try {
     const projectId = parseInt(req.params.id);
     const deleted = await deleteProject(projectId, req.user.dbId);
@@ -223,24 +225,21 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (!deleted) {
       return res.status(404).json({
         success: false,
-        error: 'Project not found'
+        error: "Project not found",
       });
     }
 
     res.json({
       success: true,
-      message: 'Project deleted successfully'
+      message: "Project deleted successfully",
     });
-
   } catch (error) {
-    console.error('❌ Error deleting project:', error);
+    console.error("❌ Error deleting project:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to delete project'
+      error: error.message || "Failed to delete project",
     });
   }
 });
-
-
 
 module.exports = router;

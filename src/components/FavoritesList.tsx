@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Heart, Star, GitFork, ExternalLink, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { getFavorites, removeFavorite } from '@/lib/favoritesService';
-import { toast } from 'sonner';
-import { useAuth } from '@/context/AuthContext';
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Heart, Star, GitFork, ExternalLink, Trash2 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { getFavorites, removeFavorite } from "@/lib/favoritesService";
+import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 interface Favorite {
   id: string;
@@ -32,7 +38,7 @@ export function useFavoritesList() {
         const response = await getFavorites(user.id);
         setFavorites(response.favorites || []);
       } catch (error) {
-        console.error('Error loading favorites:', error);
+        console.error("Error loading favorites:", error);
         setFavorites([]);
       } finally {
         setIsLoading(false);
@@ -50,7 +56,9 @@ export function useFavoritesList() {
   return { favorites, isLoading, reloadFavorites: loadFavorites };
 }
 
-export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) => {
+export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
+  reloadKey,
+}) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [favorites, setFavorites] = useState<Favorite[]>([]);
@@ -63,7 +71,7 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
         const response = await getFavorites(user.id);
         setFavorites(response.favorites || []);
       } catch (error) {
-        console.error('Error loading favorites:', error);
+        console.error("Error loading favorites:", error);
         setFavorites([]);
       } finally {
         setIsLoading(false);
@@ -82,12 +90,12 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
     if (user?.id) {
       try {
         await removeFavorite(user.id, repoId);
-        setFavorites(prev => prev.filter(fav => fav.repoId !== repoId));
+        setFavorites((prev) => prev.filter((fav) => fav.repoId !== repoId));
         toast("Removed from Favorites", {
           description: "Repository has been removed from your favorites.",
         });
       } catch (error) {
-        console.error('Error removing favorite:', error);
+        console.error("Error removing favorite:", error);
         toast("Error", {
           description: "Failed to remove favorite. Please try again.",
         });
@@ -101,7 +109,7 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
 
   const openGitHub = (htmlUrl: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    window.open(htmlUrl, '_blank');
+    window.open(htmlUrl, "_blank");
   };
 
   if (isLoading) {
@@ -115,7 +123,7 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className="animate-pulse">
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
                 <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
@@ -136,7 +144,8 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
             Favorite Repositories
           </CardTitle>
           <CardDescription>
-            No favorite repositories yet. Add some by clicking the heart icon on repository pages.
+            No favorite repositories yet. Add some by clicking the heart icon on
+            repository pages.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -166,9 +175,9 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     {favorite.avatarUrl && (
-                      <img 
-                        src={favorite.avatarUrl} 
-                        alt={favorite.owner} 
+                      <img
+                        src={favorite.avatarUrl}
+                        alt={favorite.owner}
                         className="w-6 h-6 rounded-full"
                       />
                     )}
@@ -182,9 +191,7 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
                     </p>
                   )}
                   <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                    {favorite.language && (
-                      <span>{favorite.language}</span>
-                    )}
+                    {favorite.language && <span>{favorite.language}</span>}
                     <span className="flex items-center gap-1">
                       <Star className="h-4 w-4" />
                       {favorite.stars || 0}
@@ -210,7 +217,10 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({ reloadKey }) =
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={(e) => { e.stopPropagation(); handleRemoveFavorite(favorite.repoId); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveFavorite(favorite.repoId);
+                    }}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                   >
                     <Trash2 className="h-4 w-4" />

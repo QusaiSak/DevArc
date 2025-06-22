@@ -1,9 +1,9 @@
-import { HeroSection } from './heroSection'
+import { HeroSection } from "./heroSection";
 
 export const Home = () => {
   return (
     <>
-        <HeroSection/>
+      <HeroSection />
     </>
-  )
-}
+  );
+};
