@@ -309,19 +309,22 @@ export default function RepositoryDetailsPage() {
       return;
     }
 
-    // Check what analysis data is available
-    if (
-      !analysis.structure &&
-      !analysis.codeAnalysis &&
-      !analysis.documentation &&
-      !analysis.testCases
-    ) {
+    // Check if there's ANY analysis data available
+    const hasAnalysisData =
+      analysis.structure ||
+      analysis.codeAnalysis ||
+      analysis.documentation ||
+      analysis.testCases;
+
+    if (!hasAnalysisData) {
       toast.error("No analysis data to store. Please run analysis first.");
       return;
     }
 
     try {
       const projectId = `${owner}/${repo}`;
+
+      // Store ALL available analysis data - no exceptions
       await saveAnalysis(user.id, {
         projectId,
         projectName: repository?.name || `${owner}/${repo}`,
@@ -339,8 +342,17 @@ export default function RepositoryDetailsPage() {
           : null,
       });
 
-      console.log("Analysis stored successfully!");
-      toast.success("Analysis stored successfully!");
+      console.log("All analysis data stored successfully!");
+      toast.success("Analysis Stored Successfully!", {
+        description: `Stored ${[
+          analysis.structure && "Structure Analysis",
+          analysis.codeAnalysis && "Code Analysis",
+          analysis.documentation && "Documentation",
+          analysis.testCases && "Test Cases",
+        ]
+          .filter(Boolean)
+          .join(", ")}`,
+      });
     } catch (error) {
       console.error("Failed to store analysis:", error);
       toast.error("Failed to store analysis. Please try again.");
@@ -900,19 +912,19 @@ ${example.code}
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-black">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
                 {repository.name}
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-slate-600 dark:text-slate-400 mb-4">
                 {repository.description || "No description available"}
               </p>
-              <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
                 <div className="flex items-center space-x-1">
                   <Star className="w-4 h-4" />
                   <span>{repository.stargazers_count}</span>
@@ -979,7 +991,11 @@ ${example.code}
                 </>
               )}
             </Button>
-            {analysis && (
+            {/* Show Store Analysis button if ANY analysis data exists */}
+            {(analysis.structure ||
+              analysis.codeAnalysis ||
+              analysis.documentation ||
+              analysis.testCases) && (
               <Button
                 onClick={storeAnalysis}
                 variant="outline"
@@ -1169,150 +1185,151 @@ ${example.code}
                       components={{
                         h1: ({ ...props }) => (
                           <h1
-                            className="text-2xl font-black mb-4 border-b border-slate-300 dark:border-slate-700 pb-3 bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent"
+                            className="text-3xl font-bold mb-6 pb-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent animate-in slide-in-from-left duration-500"
                             {...props}
                           />
                         ),
                         h2: ({ ...props }) => (
                           <h2
-                            className="text-xl font-bold mb-3 text-slate-800 dark:text-slate-100 mt-6"
+                            className="text-2xl font-bold mb-4 mt-8 text-slate-900 dark:text-white relative group animate-in slide-in-from-left duration-500"
                             {...props}
                           />
                         ),
                         h3: ({ ...props }) => (
                           <h3
-                            className="text-lg font-semibold mb-2 text-slate-700 dark:text-slate-200 mt-4"
+                            className="text-xl font-semibold mb-3 mt-6 text-slate-900 dark:text-white animate-in fade-in duration-500"
                             {...props}
                           />
                         ),
                         h4: ({ ...props }) => (
                           <h4
-                            className="text-base font-medium mb-2 text-slate-700 dark:text-slate-200 mt-3"
+                            className="text-lg font-medium mb-2 mt-4 text-slate-900 dark:text-white"
                             {...props}
                           />
                         ),
                         p: ({ ...props }) => (
                           <p
-                            className="mb-3 text-slate-600 dark:text-slate-300 leading-relaxed text-sm"
+                            className="mb-4 leading-relaxed text-slate-700 dark:text-slate-300 animate-in fade-in duration-700"
                             {...props}
                           />
                         ),
                         ul: ({ ...props }) => (
                           <ul
-                            className="list-disc list-inside mb-3 text-slate-600 dark:text-slate-300 space-y-1 pl-4"
+                            className="list-disc list-inside mb-4 space-y-2 pl-4 text-slate-700 dark:text-slate-300"
                             {...props}
                           />
                         ),
                         ol: ({ ...props }) => (
                           <ol
-                            className="list-decimal list-inside mb-3 text-slate-600 dark:text-slate-300 space-y-1 pl-4"
+                            className="list-none mb-4 space-y-3 pl-0 text-slate-700 dark:text-slate-300 counter-reset-[ordered-list]"
                             {...props}
                           />
                         ),
                         li: ({ ...props }) => (
                           <li
-                            className="mb-1 leading-relaxed text-sm"
+                            className="mb-1 leading-relaxed hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
                             {...props}
                           />
                         ),
-                        code: ({
-                          inline,
-                          className,
-                          children,
-                          ...props
-                        }: {
-                          inline?: boolean;
-                          children?: React.ReactNode;
-                          className?: string;
-                        }) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        code: (props: any) => {
+                          const { className, children, ...rest } = props;
                           const match = /language-(\w+)/.exec(className || "");
                           const language = match ? match[1] : "";
                           const code = String(children).replace(/\n$/, "");
+                          const isInline = !className || !match;
 
-                          // Check if it's a Mermaid diagram
-                          if (!inline && language === "mermaid") {
+                          if (!isInline && language === "mermaid") {
                             return <MermaidDiagram chart={code} />;
                           }
 
-                          return inline ? (
+                          return isInline ? (
                             <code
-                              className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-xs font-mono text-slate-700 dark:text-emerald-400 border border-slate-300 dark:border-slate-700"
-                              {...props}
+                              className="bg-slate-100/80 dark:bg-slate-800/80 px-2 py-1 rounded-md text-sm font-mono text-slate-900 dark:text-slate-100 border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 transition-colors duration-200"
+                              {...rest}
                             >
                               {children}
                             </code>
                           ) : (
-                            <code
-                              className="block bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 p-4 rounded-lg text-xs font-mono overflow-x-auto border border-slate-300 dark:border-slate-700"
-                              {...props}
-                            >
-                              {children}
-                            </code>
+                            <div className="relative group">
+                              <code
+                                className="block bg-slate-100/60 dark:bg-slate-800/60 p-4 rounded-lg text-sm font-mono overflow-x-auto text-slate-900 dark:text-slate-100 border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-all duration-200"
+                                {...rest}
+                              >
+                                {children}
+                              </code>
+                              <div className="absolute  top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
+                                >
+                                  {language || "code"}
+                                </Badge>
+                              </div>
+                            </div>
                           );
                         },
-                        pre: ({ children, ...props }) => {
-                          return (
-                            <pre
-                              className="bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 p-4 rounded-lg overflow-x-auto text-xs font-mono mb-4 border border-slate-300 dark:border-slate-700 shadow-inner"
-                              {...props}
-                            >
-                              {children}
-                            </pre>
-                          );
-                        },
+                        pre: ({ children, ...props }) => (
+                          <pre
+                            className="bg-slate-100/60 dark:bg-slate-800/60 p-6 rounded-xl overflow-x-auto text-sm font-mono mb-6 border border-slate-200/50 dark:border-slate-700/50 shadow-inner hover:shadow-lg transition-shadow duration-300 group"
+                            {...props}
+                          >
+                            {children}
+                          </pre>
+                        ),
                         a: ({ ...props }) => (
                           <a
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors decoration-blue-600/50 dark:decoration-blue-400/50 underline-offset-2"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium transition-all duration-200 relative group"
                             {...props}
                           />
                         ),
                         blockquote: ({ ...props }) => (
                           <blockquote
-                            className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-slate-100/50 dark:bg-slate-800/50 rounded-r-lg italic text-slate-600 dark:text-slate-300 backdrop-blur-sm"
+                            className="border-l-4 border-blue-500/50 pl-6 py-4 my-6 bg-blue-50/50 dark:bg-blue-950/20 rounded-r-xl italic text-slate-700 dark:text-slate-300 relative overflow-hidden group hover:bg-blue-100/50 dark:hover:bg-blue-950/30 transition-colors duration-300"
                             {...props}
                           />
                         ),
                         table: ({ ...props }) => (
-                          <div className="overflow-x-auto mb-6 rounded-lg border border-slate-300 dark:border-slate-600 shadow-lg bg-white dark:bg-slate-800/30">
+                          <div className="overflow-x-auto mb-8 rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:shadow-xl transition-shadow duration-300">
                             <table
-                              className="min-w-full border-collapse bg-white dark:bg-slate-900"
+                              className="min-w-full border-collapse"
                               {...props}
                             />
                           </div>
                         ),
                         thead: ({ ...props }) => (
                           <thead
-                            className="bg-slate-50 dark:bg-slate-800"
+                            className="bg-gradient-to-r from-slate-100/60 to-slate-200/40 dark:from-slate-800/60 dark:to-slate-700/40"
                             {...props}
                           />
                         ),
                         tbody: ({ ...props }) => (
                           <tbody
-                            className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700"
+                            className="divide-y divide-slate-200/30 dark:divide-slate-700/30"
                             {...props}
                           />
                         ),
                         th: ({ ...props }) => (
                           <th
-                            className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-6 py-3 text-left font-semibold text-slate-900 dark:text-slate-100 text-sm"
+                            className="bg-slate-100/40 dark:bg-slate-800/40 border-r border-slate-200/30 dark:border-slate-700/30 last:border-r-0 px-6 py-4 text-left font-semibold text-sm text-slate-900 dark:text-slate-100"
                             {...props}
                           />
                         ),
                         td: ({ ...props }) => (
                           <td
-                            className="border border-slate-300 dark:border-slate-700 px-6 py-3 text-slate-700 dark:text-slate-300 text-sm"
+                            className="border-r border-slate-200/20 dark:border-slate-700/20 last:border-r-0 px-6 py-4 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors duration-200"
                             {...props}
                           />
                         ),
                         hr: ({ ...props }) => (
                           <hr
-                            className="my-4 border-slate-300 dark:border-slate-700"
+                            className="my-8 border-slate-200/50 dark:border-slate-700/50"
                             {...props}
                           />
                         ),
                         img: ({ ...props }) => (
                           <img
-                            className="max-w-full h-auto rounded-lg shadow-xl my-4 border border-slate-300 dark:border-slate-700"
+                            className="max-w-full h-auto rounded-xl shadow-lg my-6 border border-slate-200/50 dark:border-slate-700/50 hover:shadow-xl transition-shadow duration-300"
                             {...props}
                           />
                         ),
@@ -1337,6 +1354,17 @@ ${example.code}
           <TabsContent value="analysis">
             {analysis.codeAnalysis ? (
               <div className="space-y-6">
+                {/* Store Analysis button at the top of analysis tab */}
+                <div className="flex justify-end">
+                  <Button
+                    onClick={storeAnalysis}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Store All Analysis Data
+                  </Button>
+                </div>
+
                 <Card>
                   <CardHeader>
                     <CardTitle>Code Quality Analysis</CardTitle>
@@ -1434,19 +1462,25 @@ ${example.code}
                       Run analysis to get detailed insights about this
                       repository
                     </p>
-                    <Button onClick={runAnalysis} disabled={analyzing}>
-                      {analyzing ? "Analyzing..." : "Run Analysis"}
-                    </Button>
-                    {analysis && (
-                      <Button
-                        onClick={storeAnalysis}
-                        variant="outline"
-                        className="bg-green-600 hover:bg-green-700 text-white border-green-600 ml-2"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Store Analysis
+                    <div className="flex justify-center space-x-2">
+                      <Button onClick={runAnalysis} disabled={analyzing}>
+                        {analyzing ? "Analyzing..." : "Run Analysis"}
                       </Button>
-                    )}
+                      {/* Show Store button if ANY analysis data exists */}
+                      {(analysis.structure ||
+                        analysis.codeAnalysis ||
+                        analysis.documentation ||
+                        analysis.testCases) && (
+                        <Button
+                          onClick={storeAnalysis}
+                          variant="outline"
+                          className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Store Analysis
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1460,14 +1494,24 @@ ${example.code}
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       <span>Enhanced Documentation</span>
-                      <Button
-                        onClick={() => exportToWord(analysis.documentation!)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Export
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={() => exportToWord(analysis.documentation!)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Export
+                        </Button>
+                        <Button
+                          onClick={storeAnalysis}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Store All Data
+                        </Button>
+                      </div>
                     </CardTitle>
                     <CardDescription>
                       Comprehensive documentation with code internals, SDLC
@@ -2024,14 +2068,30 @@ ${example.code}
                       Generate comprehensive documentation with code internals,
                       SDLC guide, and folder structure
                     </p>
-                    <Button
-                      onClick={generateDocumentation}
-                      disabled={generatingDocs}
-                    >
-                      {generatingDocs
-                        ? "Generating..."
-                        : "Generate Enhanced Documentation"}
-                    </Button>
+                    <div className="flex justify-center space-x-2">
+                      <Button
+                        onClick={generateDocumentation}
+                        disabled={generatingDocs}
+                      >
+                        {generatingDocs
+                          ? "Generating..."
+                          : "Generate Enhanced Documentation"}
+                      </Button>
+                      {/* Show Store button if ANY analysis data exists */}
+                      {(analysis.structure ||
+                        analysis.codeAnalysis ||
+                        analysis.documentation ||
+                        analysis.testCases) && (
+                        <Button
+                          onClick={storeAnalysis}
+                          variant="outline"
+                          className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Store All Data
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -2043,7 +2103,17 @@ ${example.code}
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Generated Test Cases</CardTitle>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Generated Test Cases</span>
+                      <Button
+                        onClick={storeAnalysis}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Store All Data
+                      </Button>
+                    </CardTitle>
                     <CardDescription>
                       Generated using{" "}
                       {typeof analysis.testCases.framework === "string"
@@ -2140,14 +2210,30 @@ ${example.code}
                     <p className="text-gray-600 dark:text-gray-400 mb-4">
                       Generate AI-powered test cases for this repository
                     </p>
-                    <Button
-                      onClick={generateTestCases}
-                      disabled={generatingTests}
-                    >
-                      {generatingTests
-                        ? "Generating..."
-                        : "Generate Test Cases"}
-                    </Button>
+                    <div className="flex justify-center space-x-2">
+                      <Button
+                        onClick={generateTestCases}
+                        disabled={generatingTests}
+                      >
+                        {generatingTests
+                          ? "Generating..."
+                          : "Generate Test Cases"}
+                      </Button>
+                      {/* Show Store button if ANY analysis data exists */}
+                      {(analysis.structure ||
+                        analysis.codeAnalysis ||
+                        analysis.documentation ||
+                        analysis.testCases) && (
+                        <Button
+                          onClick={storeAnalysis}
+                          variant="outline"
+                          className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Store All Data
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
