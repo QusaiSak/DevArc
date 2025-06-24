@@ -11,7 +11,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import CreateProjectPage from "./pages/CreateProject";
 import ProjectViewPage from "./pages/ProjectView";
-import PricingPage from "./pages/Pricing";
+import { Pricing } from "./pages/Pricing";
 
 function App() {
   return (
@@ -31,7 +31,7 @@ function App() {
               }
             />
             <Route path="/create-project" element={<CreateProjectPage />} />
-            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/projects/:id" element={<ProjectViewPage />} />
             <Route
               path="/repository/:owner/:repo"

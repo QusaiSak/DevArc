@@ -32,34 +32,34 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => {
 
   useEffect(() => {
     if (elementRef.current && !renderedRef.current) {
-      // Configure theme based on current mode
+      // Configure theme based on current mode using hex colors (Mermaid doesn't support OKLCH)
       const theme = isDarkMode ? "dark" : "default";
       const themeVariables = isDarkMode
         ? {
-            primaryColor: "#3b82f6",
-            primaryTextColor: "#e2e8f0",
-            primaryBorderColor: "#1e40af",
-            lineColor: "#64748b",
+            primaryColor: "#6366f1", // Convert from OKLCH to hex equivalent
+            primaryTextColor: "#f1f5f9",
+            primaryBorderColor: "#6366f1",
+            lineColor: "#94a3b8",
             sectionBkgColor: "#1e293b",
             altSectionBkgColor: "#334155",
             gridColor: "#475569",
-            secondaryColor: "#6366f1",
-            tertiaryColor: "#8b5cf6",
+            secondaryColor: "#8b5cf6",
+            tertiaryColor: "#a855f7",
             background: "#0f172a",
             mainBkg: "#1e293b",
             secondBkg: "#334155",
             tertiaryBkg: "#475569",
           }
         : {
-            primaryColor: "#3b82f6",
-            primaryTextColor: "#1f2937",
-            primaryBorderColor: "#1e40af",
-            lineColor: "#6b7280",
-            sectionBkgColor: "#f9fafb",
-            altSectionBkgColor: "#f3f4f6",
-            gridColor: "#9ca3af",
-            secondaryColor: "#6366f1",
-            tertiaryColor: "#8b5cf6",
+            primaryColor: "#6366f1", // Convert from OKLCH to hex equivalent
+            primaryTextColor: "#1e293b",
+            primaryBorderColor: "#6366f1",
+            lineColor: "#64748b",
+            sectionBkgColor: "#f8fafc",
+            altSectionBkgColor: "#f1f5f9",
+            gridColor: "#e2e8f0",
+            secondaryColor: "#8b5cf6",
+            tertiaryColor: "#a855f7",
             background: "#ffffff",
             mainBkg: "#f9fafb",
             secondBkg: "#f3f4f6",

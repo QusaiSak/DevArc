@@ -1,7 +1,6 @@
 import type { NavbarItem } from "@/types/navbar.interface";
 import { Link } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
-import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
 import {
   Github,
@@ -83,11 +82,6 @@ export const Navbar = () => {
 
           {/* Right Section */}
           <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4 flex-shrink-0">
-            {/* Mode Toggle - Hidden on mobile and tablet */}
-            <div className="hidden xl:block">
-              <ModeToggle />
-            </div>
-
             {isAuthenticated ? (
               <div className="hidden xl:flex items-center space-x-3">
                 {/* Projects Button */}
@@ -233,14 +227,6 @@ export const Navbar = () => {
             </div>
 
             <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50 space-y-4">
-              {/* Mode Toggle */}
-              <div className="flex items-center justify-between py-3 px-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-lg">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Theme
-                </span>
-                <ModeToggle />
-              </div>
-
               {isAuthenticated ? (
                 <div className="space-y-3">
                   {/* Mobile Projects Button */}

@@ -65,19 +65,19 @@ export const Footer = () => {
       href: "https://linkedin.com/company/devarc",
       label: "LinkedIn",
     },
-    { icon: Mail, href: "mailto:hello@devarc.ai", label: "Email" },
+    { icon: Mail, href: "mailto:qusaisakerwala@gmail.com", label: "Email" },
   ];
 
   const contactInfo = [
-    { icon: MapPin, text: "San Francisco, CA" },
-    { icon: Phone, text: "+1 (555) 123-4567" },
-    { icon: Mail, text: "hello@devarc.ai" },
+    { icon: MapPin, text: "Mumbai , In" },
+    { icon: Phone, text: "" },
+    { icon: Mail, text: "qusaisakerwala@gmail.com" },
   ];
 
   return (
-    <footer className="bg-slate-900 dark:bg-slate-950 text-white relative overflow-hidden">
+    <footer className="bg-background dark:bg-card text-foreground relative overflow-hidden border-t border-border">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-900 opacity-50"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-muted to-primary/5 dark:from-card dark:via-card dark:to-primary/10"></div>
 
       {/* Grid pattern */}
       <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,transparent,rgba(255,255,255,0.1))]"></div>
@@ -89,13 +89,13 @@ export const Footer = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="border-b border-slate-800 py-12 sm:py-16"
+          className="border-b border-border py-12 sm:py-16"
         >
           <div className="max-w-4xl mx-auto text-center">
-            <h3 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">
+            <h3 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 text-foreground">
               Stay Updated with DevArc
             </h3>
-            <p className="text-lg sm:text-xl text-slate-400 mb-6 sm:mb-8 max-w-2xl mx-auto px-4">
+            <p className="text-lg sm:text-xl text-muted-foreground mb-6 sm:mb-8 max-w-2xl mx-auto px-4">
               Get the latest updates on new features, AI improvements, and
               developer insights delivered to your inbox.
             </p>
@@ -103,12 +103,12 @@ export const Footer = () => {
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-sm sm:text-base"
+                className="flex-1 px-4 py-3 bg-input border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-colors text-sm sm:text-base text-foreground placeholder:text-muted-foreground"
               />
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-4 sm:px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap text-sm sm:text-base"
+                className="px-4 sm:px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap text-sm sm:text-base"
               >
                 Subscribe
                 <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -129,12 +129,14 @@ export const Footer = () => {
               className="sm:col-span-2 lg:col-span-2"
             >
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                  <Rocket className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-xl flex items-center justify-center">
+                  <Rocket className="w-4 h-4 sm:w-6 sm:h-6 text-primary-foreground" />
                 </div>
-                <span className="text-xl sm:text-2xl font-bold">DevArc</span>
+                <span className="text-xl sm:text-2xl font-bold text-foreground">
+                  DevArc
+                </span>
               </div>
-              <p className="text-slate-400 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
+              <p className="text-muted-foreground mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
                 Transforming software development with AI-powered project
                 management. Build better, ship faster, and scale smarter with
                 intelligent insights.
@@ -145,7 +147,7 @@ export const Footer = () => {
                 {contactInfo.map((item, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 sm:gap-3 text-slate-400 text-sm sm:text-base"
+                    className="flex items-center gap-2 sm:gap-3 text-muted-foreground text-sm sm:text-base"
                   >
                     <item.icon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                     <span className="text-sm">{item.text}</span>
@@ -163,10 +165,10 @@ export const Footer = () => {
                     rel="noopener noreferrer"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-colors group"
+                    className="w-8 h-8 sm:w-10 sm:h-10 bg-muted hover:bg-accent rounded-xl flex items-center justify-center transition-colors group"
                     aria-label={social.label}
                   >
-                    <social.icon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-hover:text-white transition-colors" />
+                    <social.icon className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground group-hover:text-accent-foreground transition-colors" />
                   </motion.a>
                 ))}
               </div>
@@ -182,7 +184,7 @@ export const Footer = () => {
                 transition={{ duration: 0.8, delay: sectionIndex * 0.1 }}
                 className="sm:col-span-1"
               >
-                <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-white">
+                <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-foreground">
                   {section.title}
                 </h4>
                 <ul className="space-y-2 sm:space-y-3">
@@ -196,7 +198,7 @@ export const Footer = () => {
                             navigate(link.href);
                           }
                         }}
-                        className="text-slate-400 hover:text-white transition-colors text-xs sm:text-sm cursor-pointer block"
+                        className="text-muted-foreground hover:text-foreground transition-colors text-xs sm:text-sm cursor-pointer block"
                         whileHover={{ x: 5 }}
                         transition={{ duration: 0.2 }}
                       >
@@ -216,19 +218,19 @@ export const Footer = () => {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="border-t border-slate-800 py-6 sm:py-8"
+          className="border-t border-border py-6 sm:py-8"
         >
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-            <p className="text-slate-400 text-xs sm:text-sm text-center sm:text-left">
-              © 2024 DevArc. All rights reserved. Built with ❤️ for developers.
+            <p className="text-muted-foreground text-xs sm:text-sm text-center sm:text-left">
+              © 2025 DevArc. All rights reserved. Built with ❤️ for developers.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 text-xs sm:text-sm">
-              <span className="text-slate-500">
+              <span className="text-muted-foreground">
                 Status:{" "}
-                <span className="text-green-400">All systems operational</span>
+                <span className="text-chart-2">All systems operational</span>
               </span>
-              <span className="text-slate-500">
-                Version: <span className="text-blue-400">2.1.0</span>
+              <span className="text-muted-foreground">
+                Version: <span className="text-primary">2.1.0</span>
               </span>
             </div>
           </div>

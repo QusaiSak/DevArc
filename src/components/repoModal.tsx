@@ -207,26 +207,26 @@ export const RepoImportModal: React.FC<RepoImportModalProps> = ({
 
   const getLanguageColor = (language: string | null) => {
     const colors: Record<string, string> = {
-      JavaScript: "bg-yellow-400",
-      TypeScript: "bg-blue-500",
-      Python: "bg-green-500",
-      Java: "bg-red-500",
-      "C++": "bg-pink-500",
-      "C#": "bg-purple-500",
-      Go: "bg-cyan-500",
-      Rust: "bg-orange-600",
-      PHP: "bg-purple-500",
-      Ruby: "bg-red-600",
-      Swift: "bg-orange-500",
-      Kotlin: "bg-purple-600",
-      Dart: "bg-blue-400",
-      HTML: "bg-orange-400",
-      CSS: "bg-blue-600",
-      Shell: "bg-gray-600",
-      Vue: "bg-green-400",
-      Svelte: "bg-red-400",
+      JavaScript: "bg-chart-1",
+      TypeScript: "bg-chart-2",
+      Python: "bg-chart-3",
+      Java: "bg-chart-4",
+      "C++": "bg-chart-5",
+      "C#": "bg-chart-1",
+      Go: "bg-chart-2",
+      Rust: "bg-chart-3",
+      PHP: "bg-chart-4",
+      Ruby: "bg-chart-5",
+      Swift: "bg-chart-1",
+      Kotlin: "bg-chart-2",
+      Dart: "bg-chart-3",
+      HTML: "bg-chart-4",
+      CSS: "bg-chart-5",
+      Shell: "bg-muted",
+      Vue: "bg-chart-1",
+      Svelte: "bg-chart-2",
     };
-    return colors[language || ""] || "bg-gray-400";
+    return colors[language || ""] || "bg-muted";
   };
 
   // Pagination logic

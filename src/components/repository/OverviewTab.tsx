@@ -86,13 +86,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h4 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1">
+              <h4 className="font-semibold text-sm text-muted-foreground mb-1">
                 Full Name
               </h4>
               <p className="font-mono text-sm">{repository.full_name}</p>
             </div>
             <div>
-              <h4 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1">
+              <h4 className="font-semibold text-sm text-muted-foreground mb-1">
                 Owner
               </h4>
               <div className="flex items-center space-x-2">
@@ -138,8 +138,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center space-x-4">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
-                <Star className="w-6 h-6 text-yellow-600" />
+              <div className="p-2 bg-accent/20 rounded-lg">
+                <Star className="w-6 h-6 text-accent-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">
@@ -156,8 +156,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center space-x-4">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                <GitFork className="w-6 h-6 text-blue-600" />
+              <div className="p-2 bg-primary/20 rounded-lg">
+                <GitFork className="w-6 h-6 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">

@@ -80,8 +80,10 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
       onClick={toggleFavorite}
       disabled={isLoading}
       className={`${className} ${
-        isFavorite ? "bg-red-500 hover:bg-red-600" : ""
-      }`}
+        isFavorite
+          ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+          : ""
+      } font-body`}
     >
       <Heart className={`h-4 w-4 mr-1 ${isFavorite ? "fill-current" : ""}`} />
       {isFavorite ? "Favorited" : "Add to Favorites"}

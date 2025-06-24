@@ -82,14 +82,14 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {/* Quality Score */}
-              <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-6 rounded-xl border border-green-200/50 dark:border-green-700/50">
+              <div className="bg-gradient-to-br from-primary/10 to-primary/20 p-6 rounded-xl border border-primary/30">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-green-800 dark:text-green-200">
+                  <h3 className="text-sm font-semibold text-primary">
                     Quality Score
                   </h3>
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <CheckCircle className="w-5 h-5 text-primary" />
                 </div>
-                <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+                <div className="text-3xl font-bold text-primary mb-2">
                   {analysis.codeAnalysis.qualityScore}/100
                 </div>
                 <Progress
@@ -99,14 +99,14 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
               </div>
 
               {/* Maintainability Index */}
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6 rounded-xl border border-blue-200/50 dark:border-blue-700/50">
+              <div className="bg-gradient-to-br from-accent/10 to-accent/20 p-6 rounded-xl border border-accent/30">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                  <h3 className="text-sm font-semibold text-accent-foreground">
                     Maintainability
                   </h3>
-                  <TrendingUp className="w-5 h-5 text-blue-600" />
+                  <TrendingUp className="w-5 h-5 text-accent-foreground" />
                 </div>
-                <div className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-2">
+                <div className="text-3xl font-bold text-accent-foreground mb-2">
                   {analysis.codeAnalysis.maintainabilityIndex}/100
                 </div>
                 <Progress
@@ -118,26 +118,26 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
               {/* Structure Info */}
               {analysis.structure && (
                 <>
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-6 rounded-xl border border-purple-200/50 dark:border-purple-700/50">
+                  <div className="bg-gradient-to-br from-secondary/50 to-secondary p-6 rounded-xl border border-border">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-purple-800 dark:text-purple-200">
+                      <h3 className="text-sm font-semibold text-secondary-foreground">
                         Total Files
                       </h3>
-                      <FileText className="w-5 h-5 text-purple-600" />
+                      <FileText className="w-5 h-5 text-secondary-foreground" />
                     </div>
-                    <div className="text-3xl font-bold text-purple-700 dark:text-purple-300">
+                    <div className="text-3xl font-bold text-secondary-foreground">
                       {analysis.structure.totalFiles.toLocaleString()}
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 p-6 rounded-xl border border-orange-200/50 dark:border-orange-700/50">
+                  <div className="bg-gradient-to-br from-muted/50 to-muted p-6 rounded-xl border border-border">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-200">
+                      <h3 className="text-sm font-semibold text-muted-foreground">
                         Lines of Code
                       </h3>
-                      <Code className="w-5 h-5 text-orange-600" />
+                      <Code className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <div className="text-3xl font-bold text-orange-700 dark:text-orange-300">
+                    <div className="text-3xl font-bold text-muted-foreground">
                       {analysis.structure.totalLines.toLocaleString()}
                     </div>
                   </div>
@@ -161,12 +161,10 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
                         (strength, index) => (
                           <div
                             key={index}
-                            className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50"
+                            className="flex items-start gap-3 p-3 bg-primary/10 rounded-lg border border-primary/30"
                           >
-                            <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                            <span className="text-green-800 dark:text-green-200">
-                              {strength}
-                            </span>
+                            <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                            <span className="text-primary">{strength}</span>
                           </div>
                         )
                       )}
@@ -180,7 +178,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
               analysis.codeAnalysis.weaknesses.length > 0 && (
                 <Card className="mb-6">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                    <CardTitle className="flex items-center gap-2 text-destructive">
                       <AlertTriangle className="w-5 h-5" />
                       Areas for Improvement
                     </CardTitle>
@@ -191,12 +189,10 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
                         (weakness, index) => (
                           <div
                             key={index}
-                            className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200/50 dark:border-orange-700/50"
+                            className="flex items-start gap-3 p-3 bg-destructive/10 rounded-lg border border-destructive/30"
                           >
-                            <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
-                            <span className="text-orange-800 dark:text-orange-200">
-                              {weakness}
-                            </span>
+                            <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
+                            <span className="text-destructive">{weakness}</span>
                           </div>
                         )
                       )}
@@ -210,7 +206,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
               analysis.codeAnalysis.recommendations.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                    <CardTitle className="flex items-center gap-2 text-accent-foreground">
                       <TrendingUp className="w-5 h-5" />
                       Recommendations
                     </CardTitle>

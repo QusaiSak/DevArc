@@ -89,13 +89,13 @@ export default function ProjectViewPage() {
   // Loading State
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="relative inline-block">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent bg-gradient-to-r from-blue-500 to-purple-600 p-1">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent bg-gradient-to-r from-primary to-accent p-1">
               <div className="rounded-full h-full w-full bg-background"></div>
             </div>
-            <div className="absolute inset-0 rounded-full animate-pulse bg-gradient-to-r from-blue-500 to-purple-600 opacity-20 blur-xl"></div>
+            <div className="absolute inset-0 rounded-full animate-pulse bg-gradient-to-r from-primary to-accent opacity-20 blur-xl"></div>
           </div>
           <div className="space-y-2">
             <h3 className="text-lg font-semibold text-foreground">
@@ -111,21 +111,21 @@ export default function ProjectViewPage() {
   // Error State
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950 flex items-center justify-center">
-        <Card className="max-w-md border-0 shadow-2xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 flex items-center justify-center">
+        <Card className="max-w-md border-0 shadow-2xl bg-card/70 backdrop-blur-xl">
           <CardContent className="pt-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Sparkles className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-destructive to-destructive shadow-lg flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-destructive-foreground" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">
               Oops! Something went wrong
             </h3>
-            <p className="text-red-600 dark:text-red-400 mb-6">
+            <p className="text-destructive mb-6">
               {error || "Project not found"}
             </p>
             <Button
               onClick={() => navigate("/dashboard")}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
@@ -137,7 +137,7 @@ export default function ProjectViewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header Section */}
         <div className="mb-10">
@@ -145,7 +145,7 @@ export default function ProjectViewPage() {
             <Button
               variant="outline"
               onClick={() => navigate("/dashboard")}
-              className="group w-fit bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-200 hover:bg-white/90 dark:hover:bg-slate-800/90"
+              className="group w-fit bg-card/70 backdrop-blur-sm border-border shadow-sm hover:shadow-md transition-all duration-200 hover:bg-card/90"
             >
               <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
               Back to Dashboard
@@ -155,8 +155,8 @@ export default function ProjectViewPage() {
               <div className="space-y-4 flex-1">
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                    <div className="absolute inset-0 w-3 h-3 rounded-full bg-green-500/30 animate-ping"></div>
+                    <div className="w-3 h-3 rounded-full bg-primary animate-pulse"></div>
+                    <div className="absolute inset-0 w-3 h-3 rounded-full bg-primary/30 animate-ping"></div>
                   </div>
                   <Badge
                     variant="secondary"
@@ -224,16 +224,16 @@ export default function ProjectViewPage() {
           {/* Primary Content Column */}
           <div className="xl:col-span-3 space-y-8">
             {/* SDLC Recommendation Card */}
-            <Card className="group shadow-sm hover:shadow-lg transition-all duration-300 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50">
+            <Card className="group shadow-sm hover:shadow-lg transition-all duration-300 bg-card/70 backdrop-blur-xl border border-border/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-lg">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-sm">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-sm">
                     <Settings className="w-4 h-4" />
                   </div>
                   <span>SDLC Recommendation</span>
                   <Badge
                     variant="secondary"
-                    className="ml-auto bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/50 dark:to-blue-900/50 text-purple-700 dark:text-purple-300 border-0 shadow-sm"
+                    className="ml-auto bg-gradient-to-r from-secondary to-accent text-accent-foreground border-0 shadow-sm"
                   >
                     <Sparkles className="w-3 h-3 mr-1" />
                     AI-Powered
@@ -242,18 +242,18 @@ export default function ProjectViewPage() {
               </CardHeader>
               <CardContent className="p-6 space-y-6">
                 <div className="flex items-center gap-3">
-                  <Badge className="text-base px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium border-0 shadow-sm hover:shadow-lg hover:scale-105 transition-all duration-200">
+                  <Badge className="text-base px-4 py-2 bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium border-0 shadow-sm hover:shadow-lg hover:scale-105 transition-all duration-200">
                     {project.sdlc?.recommended || "N/A"}
                   </Badge>
                 </div>
-                <p className="text-slate-600 dark:text-slate-300 leading-relaxed animate-in fade-in duration-700">
+                <p className="text-muted-foreground leading-relaxed animate-in fade-in duration-700">
                   {project.sdlc?.reasoning || "No reasoning provided"}
                 </p>
 
                 {project.sdlc?.phases && (
-                  <div className="bg-gradient-to-br from-slate-50/50 to-blue-50/30 dark:from-slate-900/50 dark:to-blue-950/30 rounded-xl p-5 border border-slate-200/50 dark:border-slate-700/50 shadow-inner backdrop-blur-sm animate-in slide-in-from-bottom duration-500">
-                    <h4 className="font-semibold flex items-center gap-2 mb-4 text-slate-900 dark:text-white">
-                      <div className="p-1.5 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 shadow-sm">
+                  <div className="bg-gradient-to-br from-muted/30 to-accent/10 rounded-xl p-5 border border-border shadow-inner backdrop-blur-sm animate-in slide-in-from-bottom duration-500">
+                    <h4 className="font-semibold flex items-center gap-2 mb-4 text-foreground">
+                      <div className="p-1.5 rounded-md bg-gradient-to-br from-primary to-accent shadow-sm">
                         <Layers className="w-4 h-4 text-white" />
                       </div>
                       Recommended Phases
@@ -266,14 +266,14 @@ export default function ProjectViewPage() {
                             className="group flex items-center gap-4 p-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-lg border border-slate-200/50 dark:border-slate-700/50 hover:shadow-md hover:border-blue-500/20 dark:hover:border-blue-400/20 transition-all duration-300 hover:scale-[1.02] animate-in slide-in-from-left"
                             style={{ animationDelay: `${index * 100}ms` }}
                           >
-                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs font-bold shadow-sm group-hover:scale-110 transition-transform duration-200">
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground text-xs font-bold shadow-sm group-hover:scale-110 transition-transform duration-200">
                               {index + 1}
                             </div>
-                            <span className="text-sm font-medium text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                            <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors duration-200">
                               {phase}
                             </span>
                             <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                              <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 animate-pulse"></div>
+                              <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary to-accent animate-pulse"></div>
                             </div>
                           </div>
                         )
@@ -285,7 +285,7 @@ export default function ProjectViewPage() {
             </Card>
 
             {/* README Documentation Card */}
-            <Card className="group shadow-sm hover:shadow-xl transition-all duration-500 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-2xl overflow-hidden">
+            <Card className="group shadow-sm hover:shadow-xl transition-all duration-500 bg-card/70 backdrop-blur-xl border border-border/50 rounded-2xl overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/30 via-transparent to-green-50/20 dark:from-emerald-950/30 dark:via-transparent dark:to-green-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               <CardHeader className="relative z-10">
                 <CardTitle className="flex items-center gap-3 text-xl">
@@ -297,7 +297,7 @@ export default function ProjectViewPage() {
                   </span>
                   <Badge
                     variant="secondary"
-                    className="ml-auto bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/50 dark:to-green-900/50 text-emerald-700 dark:text-emerald-300 border-0 shadow-lg hover:scale-105 transition-transform duration-200"
+                    className="ml-auto bg-gradient-to-r from-secondary to-accent text-accent-foreground border-0 shadow-lg hover:scale-105 transition-transform duration-200"
                   >
                     <Code2 className="w-3 h-3 mr-1" />
                     {readmeContent ? "Live" : "Overview"}
@@ -311,13 +311,13 @@ export default function ProjectViewPage() {
                     <div className="bg-gradient-to-r from-slate-100/90 to-slate-200/70 dark:from-slate-800/90 dark:to-slate-700/70 px-6 py-5 border-b border-slate-200/50 dark:border-slate-700/50 flex items-center justify-between backdrop-blur-sm">
                       <div className="flex items-center gap-4">
                         <div className="flex space-x-2">
-                          <div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-lg animate-pulse hover:scale-110 transition-transform duration-200"></div>
+                          <div className="w-3.5 h-3.5 rounded-full bg-destructive shadow-lg animate-pulse hover:scale-110 transition-transform duration-200"></div>
                           <div
                             className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-lg animate-pulse hover:scale-110 transition-transform duration-200"
                             style={{ animationDelay: "0.2s" }}
                           ></div>
                           <div
-                            className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-lg animate-pulse hover:scale-110 transition-transform duration-200"
+                            className="w-3.5 h-3.5 rounded-full bg-primary shadow-lg animate-pulse hover:scale-110 transition-transform duration-200"
                             style={{ animationDelay: "0.4s" }}
                           ></div>
                         </div>
@@ -330,9 +330,9 @@ export default function ProjectViewPage() {
                       </div>
                       <Badge
                         variant="secondary"
-                        className="bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/50 dark:to-green-900/50 text-emerald-700 dark:text-emerald-300 border-0 shadow-lg hover:scale-105 transition-transform duration-200 px-3 py-1.5"
+                        className="bg-gradient-to-r from-secondary to-accent text-accent-foreground border-0 shadow-lg hover:scale-105 transition-transform duration-200 px-3 py-1.5"
                       >
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-500 mr-2 animate-pulse"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-primary mr-2 animate-pulse"></div>
                         Live Documentation
                       </Badge>
                     </div>
@@ -550,11 +550,11 @@ export default function ProjectViewPage() {
           {/* Sidebar Column */}
           <div className="space-y-8">
             {/* Project Details Card */}
-            <Card className="shadow-sm hover:shadow-xl transition-all duration-500 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-2xl overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/20 dark:from-blue-950/30 dark:via-transparent dark:to-purple-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <Card className="shadow-sm hover:shadow-xl transition-all duration-500 bg-card/70 backdrop-blur-xl border border-border/50 rounded-2xl overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               <CardHeader className="relative z-10">
                 <CardTitle className="flex items-center gap-3 text-lg">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg group-hover:scale-110 transition-transform duration-300">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <span className="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">
@@ -594,8 +594,8 @@ export default function ProjectViewPage() {
             </Card>
 
             {/* Quick Stats Card */}
-            <Card className="shadow-sm hover:shadow-xl transition-all duration-500 bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-2xl overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/30 via-transparent to-green-50/20 dark:from-emerald-950/30 dark:via-transparent dark:to-green-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <Card className="shadow-sm hover:shadow-xl transition-all duration-500 bg-card/70 backdrop-blur-xl border border-border/50 rounded-2xl overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               <CardHeader className="relative z-10">
                 <CardTitle className="flex items-center gap-3 text-lg">
                   <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">

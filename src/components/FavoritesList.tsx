@@ -114,10 +114,10 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
 
   if (isLoading) {
     return (
-      <Card className="bg-white dark:bg-gray-800">
+      <Card className="bg-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-red-500" />
+          <CardTitle className="flex items-center gap-2 font-heading">
+            <Heart className="h-5 w-5 text-destructive" />
             Favorite Repositories
           </CardTitle>
         </CardHeader>
@@ -125,8 +125,8 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="animate-pulse">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-1/2"></div>
               </div>
             ))}
           </div>
@@ -137,13 +137,13 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
 
   if (favorites.length === 0) {
     return (
-      <Card className="bg-white dark:bg-gray-800">
+      <Card className="bg-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-red-500" />
+          <CardTitle className="flex items-center gap-2 font-heading">
+            <Heart className="h-5 w-5 text-destructive" />
             Favorite Repositories
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="font-body">
             No favorite repositories yet. Add some by clicking the heart icon on
             repository pages.
           </CardDescription>
@@ -153,13 +153,13 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
   }
 
   return (
-    <Card className="bg-white dark:bg-gray-800">
+    <Card className="bg-card">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Heart className="h-5 w-5 text-red-500" />
+        <CardTitle className="flex items-center gap-2 font-heading">
+          <Heart className="h-5 w-5 text-destructive" />
           Favorite Repositories ({favorites.length})
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="font-body">
           Your starred repositories for quick access
         </CardDescription>
       </CardHeader>
@@ -168,7 +168,7 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
           {favorites.map((favorite) => (
             <div
               key={favorite.id}
-              className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+              className="border border-border rounded-lg p-4 hover:bg-muted cursor-pointer transition-colors"
               onClick={() => openRepository(favorite)}
             >
               <div className="flex items-start justify-between">
@@ -181,16 +181,16 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
                         className="w-6 h-6 rounded-full"
                       />
                     )}
-                    <h3 className="font-semibold text-lg hover:text-blue-600 dark:text-white dark:hover:text-blue-400">
+                    <h3 className="font-semibold text-lg hover:text-primary text-foreground font-heading">
                       {favorite.repoName}
                     </h3>
                   </div>
                   {favorite.description && (
-                    <p className="text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                    <p className="text-muted-foreground mb-3 line-clamp-2 font-body">
                       {favorite.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground font-body">
                     {favorite.language && <span>{favorite.language}</span>}
                     <span className="flex items-center gap-1">
                       <Star className="h-4 w-4" />
@@ -208,7 +208,7 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
                       variant="outline"
                       size="sm"
                       onClick={(e) => openGitHub(favorite.htmlUrl!, e)}
-                      className="flex items-center gap-1"
+                      className="flex items-center gap-1 font-body"
                     >
                       <ExternalLink className="h-4 w-4" />
                       GitHub
@@ -221,7 +221,7 @@ export const FavoritesList: React.FC<{ reloadKey?: number }> = ({
                       e.stopPropagation();
                       handleRemoveFavorite(favorite.repoId);
                     }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 font-body"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

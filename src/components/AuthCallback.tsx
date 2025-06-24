@@ -55,13 +55,13 @@ export const AuthCallback = () => {
   }, [searchParams, navigate, checkAuthStatus]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600 dark:text-gray-400">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-4 text-foreground font-body">
           Completing authentication...
         </p>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
+        <p className="mt-2 text-sm text-muted-foreground font-body">
           Please wait while we sign you in...
         </p>
       </div>

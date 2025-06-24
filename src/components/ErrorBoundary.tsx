@@ -41,14 +41,14 @@ class ErrorBoundary extends Component<Props, State> {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 We encountered an unexpected error. Please try refreshing the
                 page.
               </p>
               {this.state.error && (
-                <details className="text-sm text-gray-500">
+                <details className="text-sm text-muted-foreground">
                   <summary className="cursor-pointer">Error details</summary>
-                  <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
+                  <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
                     {this.state.error.toString()}
                   </pre>
                 </details>

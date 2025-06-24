@@ -126,16 +126,16 @@ export const RepositoryHeader: React.FC<RepositoryHeaderProps> = ({
                   className="w-12 h-12 rounded-full border-2 border-white shadow-lg"
                 />
                 <div>
-                  <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+                  <h1 className="text-3xl font-bold text-foreground">
                     {repository.name}
                   </h1>
-                  <p className="text-slate-600 dark:text-slate-400">
+                  <p className="text-muted-foreground">
                     {repository.owner.login}/{repository.name}
                   </p>
                 </div>
               </div>
               {repository.description && (
-                <p className="text-lg text-slate-700 dark:text-slate-300 max-w-3xl">
+                <p className="text-lg text-foreground max-w-3xl">
                   {repository.description}
                 </p>
               )}
@@ -147,7 +147,7 @@ export const RepositoryHeader: React.FC<RepositoryHeaderProps> = ({
                 onClick={onToggleFavorite}
                 className={
                   isFavorite
-                    ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                    ? "bg-accent hover:bg-accent/80 text-accent-foreground"
                     : ""
                 }
               >
@@ -198,58 +198,50 @@ export const RepositoryHeader: React.FC<RepositoryHeaderProps> = ({
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-4 rounded-xl border border-purple-200/50 dark:border-purple-700/50">
+            <div className="bg-gradient-to-br from-muted/50 to-accent/20 p-4 rounded-xl border border-border">
               <div className="flex items-center space-x-2">
-                <Eye className="w-5 h-5 text-purple-600" />
+                <Eye className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  <p className="text-2xl font-bold text-foreground">
                     {repository.watchers_count.toLocaleString()}
                   </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Watchers
-                  </p>
+                  <p className="text-sm text-muted-foreground">Watchers</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 p-4 rounded-xl border border-orange-200/50 dark:border-orange-700/50">
+            <div className="bg-gradient-to-br from-muted/50 to-secondary/20 p-4 rounded-xl border border-border">
               <div className="flex items-center space-x-2">
-                <Calendar className="w-5 h-5 text-orange-600" />
+                <Calendar className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                  <p className="text-sm font-bold text-foreground">
                     {formatDate(repository.created_at)}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Created
-                  </p>
+                  <p className="text-xs text-muted-foreground">Created</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/20 dark:to-cyan-800/20 p-4 rounded-xl border border-cyan-200/50 dark:border-cyan-700/50">
+            <div className="bg-gradient-to-br from-muted/50 to-accent/20 p-4 rounded-xl border border-border">
               <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-cyan-600" />
+                <Clock className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                  <p className="text-sm font-bold text-foreground">
                     {formatDate(repository.updated_at)}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Updated
-                  </p>
+                  <p className="text-xs text-muted-foreground">Updated</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 p-4 rounded-xl border border-pink-200/50 dark:border-pink-700/50">
+            <div className="bg-gradient-to-br from-muted/50 to-secondary/20 p-4 rounded-xl border border-border">
               <div className="flex items-center space-x-2">
-                <Users className="w-5 h-5 text-pink-600" />
+                <Users className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                  <p className="text-sm font-bold text-foreground">
                     {formatBytes(repository.size * 1024)}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Size
-                  </p>
+                  <p className="text-xs text-muted-foreground">Size</p>
                 </div>
               </div>
             </div>
@@ -260,7 +252,7 @@ export const RepositoryHeader: React.FC<RepositoryHeaderProps> = ({
             {repository.language && (
               <Badge
                 variant="secondary"
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0 px-3 py-1"
+                className="bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 px-3 py-1"
               >
                 {repository.language}
               </Badge>
@@ -278,7 +270,7 @@ export const RepositoryHeader: React.FC<RepositoryHeaderProps> = ({
             <Button
               onClick={onRunAnalysis}
               disabled={analyzing}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {analyzing ? (
                 <>

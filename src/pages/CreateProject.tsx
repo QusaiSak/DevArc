@@ -156,14 +156,14 @@ export default function CreateProjectPage() {
       bestFor:
         "Web applications, mobile apps, and projects with evolving requirements",
       icon: "🔄",
-      color: "from-blue-500 to-cyan-500",
+      color: "from-primary to-accent",
     },
     Scrum: {
       description: "Framework with sprints, daily standups, and defined roles",
       benefits: ["Clear structure", "Team accountability", "Regular delivery"],
       bestFor: "Complex projects with large teams and clear sprint goals",
       icon: "🏃‍♂️",
-      color: "from-green-500 to-emerald-500",
+      color: "from-accent to-primary",
     },
     Kanban: {
       description: "Visual workflow management with continuous delivery",
@@ -174,7 +174,7 @@ export default function CreateProjectPage() {
       ],
       bestFor: "Maintenance projects, support teams, and continuous delivery",
       icon: "📋",
-      color: "from-yellow-500 to-orange-500",
+      color: "from-secondary to-accent",
     },
     Waterfall: {
       description: "Sequential phases with comprehensive documentation",
@@ -185,7 +185,7 @@ export default function CreateProjectPage() {
       ],
       bestFor: "Projects with fixed requirements and regulatory compliance",
       icon: "🌊",
-      color: "from-indigo-500 to-purple-500",
+      color: "from-muted to-secondary",
     },
     DevOps: {
       description:
