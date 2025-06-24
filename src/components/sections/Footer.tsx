@@ -129,12 +129,10 @@ export const Footer = () => {
               className="sm:col-span-2 lg:col-span-2"
             >
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-xl flex items-center justify-center">
-                  <Rocket className="w-4 h-4 sm:w-6 sm:h-6 text-primary-foreground" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
+                  <Rocket className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <span className="text-xl sm:text-2xl font-bold text-foreground">
-                  DevArc
-                </span>
+                <span className="text-xl sm:text-2xl font-bold">DevArc</span>
               </div>
               <p className="text-muted-foreground mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
                 Transforming software development with AI-powered project

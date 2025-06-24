@@ -652,6 +652,13 @@ ${
                 onStoreAnalysis={storeAnalysis}
                 analyzing={analyzing}
               />
+              {(analysis.structure || analysis.codeAnalysis) && (
+                <div className="mt-6 text-center">
+                  <Button onClick={runAnalysis} disabled={analyzing}>
+                    {analyzing ? "Re-running Analysis..." : "Re-run Analysis"}
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="documentation">
@@ -670,6 +677,18 @@ ${
                   )
                 }
               />
+              {analysis.documentation && (
+                <div className="mt-6 text-center">
+                  <Button
+                    onClick={generateDocumentation}
+                    disabled={generatingDocs}
+                  >
+                    {generatingDocs
+                      ? "Re-generating Docs..."
+                      : "Re-generate Documentation"}
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="tests">
@@ -687,6 +706,18 @@ ${
                   )
                 }
               />
+              {analysis.testCases && (
+                <div className="mt-6 text-center">
+                  <Button
+                    onClick={generateTestCases}
+                    disabled={generatingTests}
+                  >
+                    {generatingTests
+                      ? "Re-generating Tests..."
+                      : "Re-generate Test Cases"}
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="commits">
