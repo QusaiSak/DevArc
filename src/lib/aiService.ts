@@ -1,331 +1,1646 @@
-import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import type {
+  AiMessage,
+  AiResponseOptions,
+  ProjectData,
+  SDDProjectInput,
+} from "@/types/ai.interface";
 import type { ProjectStructure } from "@/types/codeparser.interface";
-import type { ProjectData, SDDProjectInput } from "@/types/ai.interface";
+
+// ✅ Wrap response parsing in a reusable function
+export function parseAiJsonResponse(aiText: string): any {
+  try {
+    // Trim whitespace
+    let sanitized = aiText.trim();
+
+    // Remove ```json or ``` wrapping if present
+    if (sanitized.startsWith("```json")) {
+      sanitized = sanitized.replace(/^```json/, "").trim();
+    }
+    if (sanitized.startsWith("```")) {
+      sanitized = sanitized.replace(/^```/, "").trim();
+    }
+    if (sanitized.endsWith("```")) {
+      sanitized = sanitized.slice(0, -3).trim();
+    }
+
+    // Optional: fix any escaped characters (not always needed, but safe)
+    sanitized = sanitized
+      .replace(/\\"/g, '"') // Unescape quotes
+      .replace(/\\n/g, "") // Remove newline escapes
+      .replace(/\\r/g, "") // Remove carriage returns
+      .replace(/^"+|"+$/g, ""); // Trim surrounding quotes if present
+
+    // Parse final cleaned string
+    return JSON.parse(sanitized);
+  } catch (err) {
+    console.error("❌ Failed to parse AI JSON response:", err);
+    console.log("🔎 Raw AI response was:\n", aiText);
+    throw new Error("Could not parse AI response as valid JSON.");
+  }
+}
+const DEFAULT_OPTIONS: AiResponseOptions = {
+  model: "mistralai/devstral-small:free",
+  systemPrompt:
+    "You are a senior software development consultant, codebase auditor, and technical architect with expertise in modern software engineering practices and industry standards.\n\n" +
+    "Your role is to thoroughly analyze code repositories and provide high-value, context-aware insights and recommendations across six key areas:\n\n" +
+    "1. **Code Structure & Architecture Analysis**\n" +
+    "- Identify architectural patterns including Layered (N-tier), MVC/MVP/MVVM, microservices, event-driven, hexagonal, and clean architecture[1][2][4]\n" +
+    "- Evaluate separation of concerns, cohesion, coupling, and SOLID principles adherence[6][17]\n" +
+    "- Assess scalability, maintainability, and extensibility characteristics[1][4]\n" +
+    "- Analyze component interactions, data flow patterns, and dependency management[6][17]\n" +
+    "- Highlight architectural decisions, trade-offs, and technical debt implications[17][23]\n\n" +
+    "2. **SDLC Methodology Recommendation**\n" +
+    "- Recommend optimal Software Development Life Cycle model from: Agile, Scrum, Kanban, Waterfall, DevOps, Lean, Spiral, V-Model[9][10][11]\n" +
+    "- Apply evidence-based selection criteria: team size (3-7 optimal for Agile frameworks), project complexity, requirements stability, risk tolerance, timeline constraints, and stakeholder involvement[12][13][14]\n" +
+    "- Consider hybrid approaches when pure methodologies don't fully address project needs[14][16]\n" +
+    "- Justify recommendations with specific project attributes and methodology strengths alignment[12][13]\n\n" +
+    "3. **Code Quality Assessment**\n" +
+    "- Evaluate using industry-standard metrics: cyclomatic complexity, code coverage, maintainability index, coupling/cohesion ratios, and Halstead metrics[17][18][19][21][24]\n" +
+    "- Identify code smells including duplicated code, long methods, large classes, complex conditionals, and inappropriate intimacy[22][42][46]\n" +
+    "- Assess technical debt using metrics like defect ratio, code churn, technical debt ratio, and time to market impact[23]\n" +
+    "- Evaluate adherence to language-specific best practices and framework conventions[17][18]\n" +
+    "- Analyze readability, testability, reusability, and security considerations[18][20]\n\n" +
+    "4. **Test Coverage & Test Case Generation**\n" +
+    "- Apply testing pyramid principles with appropriate unit (70%), integration (20%), and e2e (10%) test distribution[30][31]\n" +
+    "- Generate comprehensive test cases following industry best practices: clear objectives, risk-based prioritization, and 80/20 rule application[25][26][28]\n" +
+    "- Cover positive scenarios, negative testing, boundary value analysis, and edge cases[25][29][32]\n" +
+    "- Include proper test data management, mock object strategies, and test isolation patterns[25][30]\n" +
+    "- Recommend appropriate testing frameworks based on technology stack (Jest, pytest, JUnit, Cypress, Selenium)[31]\n" +
+    "- Prioritize test types based on risk assessment and business critical functionality[26][32]\n\n" +
+    "5. **Documentation Generation**\n" +
+    "- Produce IEEE 1016-compliant Software Design Document (SDD) level documentation[38][41]\n" +
+    "- Include system architecture, component design, data design, interface specifications, and operational scenarios[33][35][36]\n" +
+    "- Document folder structure, API endpoints, key algorithms, and data flow patterns[35][37]\n" +
+    "- Create accurate Mermaid diagrams using proper syntax: flowchart TD/LR for processes, sequenceDiagram for interactions, graph for dependencies, and architecture diagrams for system structure[39]\n" +
+    "- Ensure documentation follows technical writing best practices: clarity, conciseness, consistent formatting, and audience-appropriate content[33][34][37]\n" +
+    "- Include traceability matrices linking requirements to components and validation criteria[38]\n\n" +
+    "6. **Refactoring Suggestions**\n" +
+    "- Recommend evidence-based refactoring techniques: extract method/class, simplify conditionals, eliminate duplication, and improve naming conventions[42][44][46]\n" +
+    "- Apply systematic refactoring approaches including Red-Green-Refactor, refactoring by abstraction, and preparatory refactoring[44][47]\n" +
+    "- Prioritize changes based on impact assessment: readability improvement, performance optimization, maintainability enhancement, and complexity reduction[42][46][48]\n" +
+    "- Ensure refactoring maintains backward compatibility and external behavior consistency[47][49]\n" +
+    "- Recommend small, incremental changes with comprehensive test coverage before implementation[47][49]\n\n" +
+    "Output Instructions:\n" +
+    "- Provide practical, actionable recommendations with specific implementation guidance tailored to the codebase context\n" +
+    "- Include quantitative assessments where applicable (complexity scores, coverage percentages, technical debt ratios)\n" +
+    "- Maintain professional, concise communication focused on high-impact improvements\n" +
+    "- Avoid explaining basic concepts; concentrate on advanced insights and strategic recommendations\n" +
+    "- Structure responses as valid JSON with clear categorization and prioritization\n" +
+    "- Include confidence levels and risk assessments for major recommendations\n\n" +
+    "Context Awareness:\n" +
+    "- Adapt analysis depth to project scale and team maturity level\n" +
+    "- Consider technology stack limitations and framework-specific best practices\n" +
+    "- Account for business domain requirements and regulatory compliance needs\n" +
+    "- Integrate modern development practices including CI/CD, containerization, and cloud-native considerations\n\n" +
+    "Treat each analysis as strategic input for engineering leadership making architectural decisions, resource allocation, and technical roadmap planning. Prioritize clarity, precision, evidence-based reasoning, and actionable outcomes.",
+  temperature: 0.5,
+  maxTokens: 8192,
+};
+
+export const generateAiResponse = async (
+  messages: AiMessage[],
+  options: Partial<AiResponseOptions> = {}
+): Promise<string> => {
+  try {
+    const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+
+    if (
+      messages.every((msg) => msg.role !== "system") &&
+      mergedOptions.systemPrompt
+    ) {
+      messages = [
+        { role: "system", content: mergedOptions.systemPrompt },
+        ...messages,
+      ];
+    }
+
+    console.log(
+      "AI Request - Messages:",
+      messages.map((m) => ({ role: m.role, contentLength: m.content.length }))
+    );
+    console.log("AI Request - Options:", mergedOptions);
+
+    const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+
+    if (!OPENROUTER_API_KEY) {
+      console.error("OpenRouter API key not found");
+      throw new Error("OpenRouter API key not found");
+    }
+
+    const requestBody = {
+      model: mergedOptions.model,
+      messages,
+      temperature: mergedOptions.temperature,
+      max_tokens: mergedOptions.maxTokens,
+    };
+
+    console.log("AI Request Body:", JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "DevArc Assistant",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    console.log("AI Response Status:", response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI Service Error Response:", errorText);
+      throw new Error(
+        `API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const result = await response.json();
+    console.log("AI Response Result:", result);
+
+    const content = result.choices?.[0]?.message?.content;
+
+    if (!content) {
+      console.error("No content in AI response:", result);
+      throw new Error("No content received from AI service");
+    }
+
+    console.log("AI Response Content Length:", content.length);
+    return content;
+  } catch (error) {
+    console.error("Error generating AI response:", error);
+    throw error;
+  }
+};
 
 export class AIAnalyzer {
-  private model = openai("gpt-4o-mini");
+  async generateSDLCRecommendation(projectData: ProjectData): Promise<{
+    recommended: string;
+    reasoning: string;
+    phases: string[];
+    alternatives: Array<{
+      model: string;
+      suitability: number;
+      pros: string[];
+      cons: string[];
+    }>;
+  }> {
+    const prompt = `You are a senior software architect and SDLC strategist with expertise in modern software development practices and methodology selection.
 
-  async generateSDLCRecommendation(projectData: ProjectData) {
-    const prompt = `
-You are an expert software development consultant. Based on the following project information, recommend the most suitable SDLC (Software Development Life Cycle) methodology and provide detailed reasoning.
+Evaluate the project based on the following detailed input and recommend the **most suitable Software Development Life Cycle (SDLC) methodology**. Your analysis must be strategic, contextual, and based on evidence-driven selection criteria that consider project complexity, team dynamics, and organizational constraints.
 
-Project Details:
-- Name: ${projectData.name}
-- Description: ${projectData.description}
-- Type: ${projectData.type}
-- Team Size: ${projectData.teamSize}
-- Timeline: ${projectData.timeline}
-- Complexity: ${projectData.complexity}
-- Key Features: ${projectData.keyFeatures}
-- Requirements: ${projectData.requirements}
-- Risk Factors: ${projectData.riskFactors}
-- Additional Context: ${projectData.additionalContext}
+### Project Overview:
+- **Name**: ${projectData.name}
+- **Description**: ${projectData.description}
+- **Type**: ${projectData.type} (e.g., Web App, Mobile App, API, Enterprise System)
+- **Team Size**: ${projectData.teamSize}
+- **Timeline**: ${projectData.timeline}
+- **Complexity Level**: ${projectData.complexity} (Low, Medium, High)
+- **Key Features**: ${projectData.keyFeatures}
+- **Risk Factors**: ${projectData.riskFactors}
+- **Requirements**: ${projectData.requirements}
+- **Additional Context**: ${projectData.additionalContext}
 
-Available SDLC methodologies to choose from:
-- Agile
-- Scrum
-- Kanban
-- Waterfall
-- DevOps
-- Lean
-- Spiral
-- V-Model
+---
 
-Please respond with a JSON object containing:
+### Task:
+
+Based on the provided project details, evaluate and select the **best-fit SDLC methodology** from the following options:
+- **Agile**: Iterative development with continuous feedback and adaptation
+- **Scrum**: Framework within Agile focusing on sprints and cross-functional teams
+- **Kanban**: Visual workflow management with continuous delivery
+- **Waterfall**: Sequential phases with comprehensive upfront planning
+- **DevOps**: Integration of development and operations with continuous deployment
+- **Lean**: Waste elimination and value stream optimization
+- **Spiral**: Risk-driven iterative approach with prototyping
+- **V-Model**: Verification and validation focused sequential development
+
+### Selection Criteria Framework:
+
+Your decision should systematically evaluate:
+
+**Team Dynamics & Collaboration**
+- Team size optimization (3-7 members ideal for most methodologies)
+- Geographic distribution and communication needs
+- Skill level and experience with methodologies
+- Cross-functional collaboration requirements
+
+**Project Characteristics**
+- Requirements clarity and stability
+- Technical complexity and innovation level
+- Integration complexity and dependencies
+- Performance and scalability requirements
+
+**Risk & Quality Management**
+- Risk tolerance and mitigation strategies
+- Quality assurance and testing requirements
+- Compliance and regulatory constraints
+- Documentation and traceability needs
+
+**Timeline & Resource Constraints**
+- Schedule flexibility vs. fixed deadlines
+- Budget limitations and cost optimization
+- Resource availability and allocation
+- Market timing and competitive pressures
+
+**Organizational Context**
+- Stakeholder involvement and feedback frequency
+- Change management and adaptability
+- Process maturity and governance requirements
+- Long-term maintenance and support considerations
+
+---
+
+### Expected Output:
+
+Respond in **valid JSON** format with the following enhanced structure:
+
 {
-  "recommended": "methodology_name",
-  "reasoning": "detailed explanation of why this methodology is best suited for this project",
-  "phases": ["phase1", "phase2", "phase3", ...] // key phases for this methodology
+  "recommended": "<Most suitable SDLC methodology>",
+  "reasoning": "<A detailed explanation of why this model is the best fit, tied directly to project attributes>",
+  "phases": ["<List of recommended phases for this SDLC>", "<Phase 2>", "<Phase 3>"],
+  "alternatives": [
+    {
+      "name": "<Alternative methodology name>",
+      "suitabilityScore": <0-100>,
+      "pros": ["<List of advantages>"],
+      "cons": ["<List of disadvantages>"],
+      "additionalConsiderations": "<Optional insights, e.g., when this might still work well>"
+    }
+  ]
 }
 
-Consider factors like team size, project complexity, timeline, requirements clarity, and risk factors in your recommendation.
-`;
+---
+
+### Enhanced Output Guidelines:
+
+**Analysis Depth**
+- Provide quantitative reasoning where possible (e.g., team size optimization, timeline estimates)
+- Reference industry best practices and proven patterns
+- Consider both immediate project needs and long-term maintainability
+
+**Comparative Analysis**
+- Score alternatives based on project-specific criteria, not generic advantages
+- Explain trade-offs explicitly with business impact assessment
+- Identify potential pivot points and adaptation strategies
+
+**Strategic Alignment**
+- Align methodology selection with business objectives and organizational maturity
+- Consider technology stack compatibility and tooling requirements
+- Factor in team learning curve and adoption challenges
+
+**Risk-Aware Recommendations**
+- Identify methodology-specific risks and mitigation strategies
+- Provide contingency planning for common failure scenarios
+- Include early warning indicators for methodology effectiveness
+
+**Modern Practices Integration**
+- Incorporate DevOps practices regardless of base methodology
+- Consider continuous integration/continuous deployment (CI/CD) requirements
+- Address security, performance, and scalability from methodology perspective
+
+---
+
+Generate a decision that will directly influence product development roadmap, resource allocation, and team structure. Be strategic, evidence-based, and aligned with contemporary software engineering excellence standards.`;
 
     try {
-      const result = await generateText({
-        model: this.model,
-        prompt,
-        temperature: 0.3,
-      });
-
-      // Parse the JSON response
-      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      // Fallback if JSON parsing fails
-      return {
-        recommended: "Agile",
-        reasoning: "Based on the project characteristics, Agile methodology is recommended for its flexibility and iterative approach.",
-        phases: ["Planning", "Design", "Development", "Testing", "Deployment", "Review"]
-      };
+      const response = await generateAiResponse([
+        { role: "user", content: prompt },
+      ]);
+      return parseAiJsonResponse(response);
     } catch (error) {
-      console.error("Error generating SDLC recommendation:", error);
-      throw new Error("Failed to generate SDLC recommendation");
+      console.error("AI SDLC analysis failed:", error);
+      return this.fallbackSDLCRecommendation(projectData);
     }
   }
 
-  async generateSDDReadme(projectData: SDDProjectInput): Promise<string> {
-    const prompt = `
-Create a comprehensive Software Design Document (SDD) in Markdown format for the following project:
+  async analyzeCodeStructure(structure: ProjectStructure): Promise<{
+    qualityScore: number;
+    strengths: string[];
+    weaknesses: string[];
+    recommendations: string[];
+    maintainabilityIndex: number;
+  }> {
+    const prompt = `You are a senior software engineer and code quality auditor.
 
-Project Information:
-- Name: ${projectData.name}
-- Description: ${projectData.description}
-- Type: ${projectData.type}
-- Team Size: ${projectData.teamSize}
-- Timeline: ${projectData.timeline}
-- Complexity: ${projectData.complexity}
-- Tech Stack: ${projectData.techStack}
-- Key Features: ${projectData.keyFeatures}
-- Risk Factors: ${projectData.riskFactors}
-- Requirements: ${projectData.requirements}
-- Additional Context: ${projectData.additionalContext}
-- SDLC Model: ${projectData.sdlcModel}
+Analyze the following codebase metadata and provide a comprehensive, insight-rich evaluation of the project's structure, maintainability, and quality.
 
-Generate a professional README.md that includes:
+### Codebase Overview:
+- **Total Files**: ${structure.totalFiles}
+- **Total Lines of Code**: ${structure.totalLines}
+- **Languages Used**: ${JSON.stringify(structure.languages)}
+- **Test Coverage**: ${structure.testCoverage}%
+- **Average Cyclomatic Complexity**: ${structure.complexity.average}
+- **Architecture Pattern**: ${structure.patterns.architecture}
+- **Frameworks Detected**: ${structure.patterns.framework.join(", ")}
+- **Reported Issues**: ${structure.issues.length}
 
-1. Project title and description
-2. Table of contents
-3. Features overview
-4. Technology stack
-5. Architecture overview
-6. Installation and setup instructions
-7. Usage examples
-8. Development workflow (based on ${projectData.sdlcModel})
-9. Testing strategy
-10. Deployment guidelines
-11. Contributing guidelines
-12. Risk mitigation strategies
-13. Project timeline and milestones
-14. Team structure and roles
-15. License information
+---
 
-Make it comprehensive, professional, and suitable for a production repository. Use proper Markdown formatting with headers, lists, code blocks, and badges where appropriate.
-`;
+### Instructions:
 
-    try {
-      const result = await generateText({
-        model: this.model,
-        prompt,
-        temperature: 0.4,
-        maxTokens: 4000,
-      });
+Based on the data, perform a critical codebase analysis and return a structured assessment. Your response should include:
 
-      return result.text;
-    } catch (error) {
-      console.error("Error generating SDD README:", error);
-      throw new Error("Failed to generate project documentation");
-    }
-  }
+Your analysis must include:  
+1. **Code Health & Architectural Strengths**: Highlight clear non-generic strengths grounded in the observed architecture and technology choices.[2]  
+2. **Technical Debt & Risk Areas**: Identify complexity hotspots (cyclomatic complexity thresholds), test gaps, and risk factors driving maintenance overhead.[3]  
+3. **Actionable Recommendations**: Propose targeted steps for maintainability, readability, performance, and test coverage improvements.[5]  
+4. **Testability & Scalability Assessment**: Evaluate the project’s readiness for robust testing and horizontal scaling based on design patterns and coverage metrics.[4]
 
-  async analyzeCodeStructure(structure: ProjectStructure) {
-    const prompt = `
-Analyze the following code structure and provide insights:
+---
 
-Project Structure:
-- Total Files: ${structure.totalFiles}
-- Total Lines: ${structure.totalLines}
-- Languages: ${JSON.stringify(structure.languages)}
-- Test Coverage: ${structure.testCoverage}%
-- Average Complexity: ${structure.complexity.average}
-- Architecture: ${structure.patterns.architecture}
-- Frameworks: ${structure.patterns.framework.join(", ")}
-- Patterns: ${structure.patterns.patterns.join(", ")}
+### Response Format:
 
-Issues Found:
-${structure.issues.map(issue => `- ${issue.severity}: ${issue.message} (${issue.file}:${issue.line})`).join("\n")}
+Respond with **ONLY valid JSON**, using the following structure:
 
-Provide a comprehensive analysis including:
-1. Code quality score (0-100)
-2. Strengths of the codebase
-3. Areas for improvement
-4. Specific recommendations
-5. Maintainability index (0-100)
-
-Respond in JSON format:
 {
-  "qualityScore": number,
-  "maintainabilityIndex": number,
-  "strengths": ["strength1", "strength2", ...],
-  "weaknesses": ["weakness1", "weakness2", ...],
-  "recommendations": ["recommendation1", "recommendation2", ...]
+  "qualityScore": <number 0-100>,  // A holistic score for code quality
+  "strengths": ["<Clear, non-generic strengths observed from the data>"],
+  "weaknesses": ["<Specific weaknesses and limitations>"],
+  "recommendations": ["<Actionable steps to improve code quality and maintainability>"],
+  "maintainabilityIndex": <number 0-100> // Based on structure, complexity, and test coverage
 }
+
+---
+
+### Guidelines:
+- Ground your scoring and insights in metrics such as cyclomatic complexity and maintainability index.[3]  
+- Tailor your analysis to the exact languages, frameworks, and architectural patterns detected.[2]  
+- Focus on high-impact, evidence-based recommendations that a tech lead can directly implement.[8]  
+- Do NOT include explanations or markdown—return the JSON only.
+
+---
+Generate your JSON evaluation as if it will be reviewed by a technical lead conducting a code review across teams. Prioritize clarity, accuracy, and actionability.
 `;
 
     try {
-      const result = await generateText({
-        model: this.model,
-        prompt,
-        temperature: 0.3,
-      });
-
-      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      throw new Error("Failed to parse analysis result");
+      const response = await generateAiResponse([
+        { role: "user", content: prompt },
+      ]);
+      return parseAiJsonResponse(response);
     } catch (error) {
-      console.error("Error analyzing code structure:", error);
-      throw new Error("Failed to analyze code structure");
-    }
-  }
-
-  async generateComprehensiveDocumentation(
-    structure: ProjectStructure,
-    language: string,
-    projectName: string
-  ) {
-    const prompt = `
-Generate comprehensive technical documentation for a ${language} project named "${projectName}".
-
-Project Structure Analysis:
-- Total Files: ${structure.totalFiles}
-- Total Lines: ${structure.totalLines}
-- Languages: ${JSON.stringify(structure.languages)}
-- Architecture: ${structure.patterns.architecture}
-- Frameworks: ${structure.patterns.framework.join(", ")}
-
-Key Files and Components:
-${structure.files.slice(0, 10).map(file => 
-  `- ${file.path} (${file.lines} lines, ${file.functions.length} functions)`
-).join("\n")}
-
-Generate documentation including:
-1. Project summary
-2. Architecture overview with pattern and technologies
-3. Folder structure analysis
-4. Code internals and flow
-5. Key components and their purposes
-6. API endpoints (if applicable)
-7. Data models and relationships
-8. Mermaid diagram for system architecture
-9. Usage examples with code
-
-Respond in JSON format with the complete documentation structure.
-`;
-
-    try {
-      const result = await generateText({
-        model: this.model,
-        prompt,
-        temperature: 0.4,
-        maxTokens: 4000,
-      });
-
-      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      // Fallback documentation structure
-      return {
-        summary: `Comprehensive documentation for ${projectName}`,
-        architecture: {
-          pattern: structure.patterns.architecture,
-          description: `This project follows the ${structure.patterns.architecture} pattern`,
-          technologies: structure.patterns.framework,
-        },
-        mermaidDiagram: `graph TD\n    A[User] --> B[Frontend]\n    B --> C[Backend]\n    C --> D[Database]`,
-        examples: [
-          {
-            title: "Basic Usage",
-            description: "How to get started with the project",
-            code: "// Example code here",
-            explanation: "This example shows basic usage"
-          }
-        ]
-      };
-    } catch (error) {
-      console.error("Error generating documentation:", error);
-      throw new Error("Failed to generate documentation");
+      console.error("AI structure analysis failed:", error);
+      return this.fallbackStructureAnalysis(structure);
     }
   }
 
   async generateTestCasesFromStructure(
     structure: ProjectStructure,
     language: string,
-    projectName: string
-  ) {
-    const prompt = `
-Generate comprehensive test cases for a ${language} project named "${projectName}".
+    repositoryName: string
+  ): Promise<{
+    testCases: Array<{
+      name: string;
+      description: string;
+      code: string;
+      type: "unit" | "integration" | "e2e";
+      priority: "high" | "medium" | "low";
+      file: string;
+    }>;
+    coverage: number;
+    framework: string;
+    summary: string;
+  }> {
+    const codeFiles = structure.files.filter(
+      (file) =>
+        file.content &&
+        file.content.trim().length > 10 &&
+        this.isCodeFile(file.path)
+    );
 
-Project Analysis:
-- Total Files: ${structure.totalFiles}
-- Languages: ${JSON.stringify(structure.languages)}
-- Architecture: ${structure.patterns.architecture}
-- Current Test Coverage: ${structure.testCoverage}%
+    if (codeFiles.length === 0) {
+      return this.fallbackTestGenerationFromStructure(language, repositoryName);
+    }
 
-Key Functions to Test:
-${structure.files.slice(0, 5).map(file => 
-  file.functions.slice(0, 3).map(func => 
-    `- ${func.name} in ${file.path} (complexity: ${func.complexity})`
-  ).join("\n")
-).join("\n")}
+    const maxFiles = 5;
+    const maxFileContentLength = 2000;
+    const selectedFiles = codeFiles.slice(0, maxFiles).map((f) => ({
+      path: f.path,
+      content:
+        f.content.length > maxFileContentLength
+          ? f.content.substring(0, maxFileContentLength) + "\n...(truncated)"
+          : f.content,
+    }));
 
-Generate test cases including:
-1. Unit tests for key functions
-2. Integration tests for components
-3. End-to-end tests for user workflows
-4. Edge case testing
-5. Performance tests
+    let aggregatedContent = `Repository: ${repositoryName}\nLanguage: ${language}\nTotal Files: ${structure.totalFiles}\nTotal Lines: ${structure.totalLines}\n\n`;
+    for (const file of selectedFiles) {
+      aggregatedContent += `\n=== FILE: ${file.path} ===\n\n${file.content}\n\n=== END FILE ===\n`;
+    }
 
-For each test case, provide:
-- Name
-- Type (unit/integration/e2e)
-- Priority (high/medium/low)
-- Description
-- Test code in ${language}
+    const prompt = `You are a senior QA automation engineer and test strategist with expertise in comprehensive test design and modern testing frameworks.
 
-Respond in JSON format:
+Analyze the following ${language} repository and generate a comprehensive set of test cases that ensures high confidence in code correctness, reliability, and robustness through systematic coverage of all critical testing dimensions.
+Overview
+The refined system prompt ensures strict alignment with IEEE 1016 Software Design Description standards for comprehensive software design documentation. It integrates modern GitHub README best practices and mandates generation of accurate Mermaid diagrams corresponding only to the project’s actual architecture and workflows. The prompt preserves the exact JSON output structure to maintain compatibility with existing automation pipelines.
+### Repository Content (Partial Overview):
+${aggregatedContent}
+
+---
+
+### Your Objectives:
+
+Generate a rich suite of test cases following the test automation pyramid principle [6] that addresses all relevant layers of the codebase. Ensure comprehensive coverage across:
+
+✅ **Unit tests** – Individual functions, methods, and classes with isolated dependencies [7][14]
+🔗 **Integration tests** – Components/modules interacting together, API endpoints, database connections [8]  
+⚠️ **Edge cases** – Boundary values, null/undefined inputs, empty collections, numeric overflows [5][24]
+❌ **Error conditions** – Exception handling, network failures, timeout scenarios, fallback logic [24][25]
+📊 **Business logic validation** – Functional behavior according to requirements and business rules [25]
+
+### Testing Strategy Framework:
+
+Apply these evidence-based testing principles [1][2]:
+
+**Risk-Based Prioritization**: Focus on high-risk, high-impact functionality first [2]
+**80/20 Rule**: Ensure core functionality receives comprehensive coverage before edge cases [2]
+**Negative Testing**: Include scenarios with invalid inputs and unexpected conditions [5][24]
+**Data-Driven Approach**: Use realistic test data that mirrors production scenarios [23][26]
+**Mocking Strategy**: Isolate units under test with appropriate mock objects and stubs [18][22]
+
+---
+
+### Output Format:
+
+RRespond with **ONLY valid JSON** using this structure:
+
 {
   "testCases": [
     {
-      "name": "test name",
+      "name": "Test case name",
+      "description": "Test case description",
+      "code": "Test code implementation",
       "type": "unit|integration|e2e",
       "priority": "high|medium|low",
-      "description": "what this test validates",
-      "code": "actual test code"
+      "file": "Source file being tested"
     }
   ],
-  "coverage": estimated_coverage_percentage,
-  "framework": "recommended_testing_framework"
+  "coverage": <estimated coverage percentage 0-100>,
+  "framework": "Testing framework name",
+  "summary": "Summary of test strategy and coverage"
 }
+
+---
+
+### Enhanced Guidelines:
+
+**Framework-Specific Implementation** [7][14][17]:
+- **JavaScript**: Use Jest syntax with describe/it blocks, expect() assertions, beforeEach/afterEach hooks [21]
+- **Python**: Use pytest with assert statements, fixtures, parametrize decorators [14][17]
+- **Java**: Use JUnit 5 with @Test, @BeforeEach, @Mock annotations, assertEquals() methods [14][20]
+- **Other languages**: Apply equivalent framework conventions and best practices
+
+**Test Naming Conventions** [15]:
+- Follow Method_Scenario_Behavior pattern for clarity and consistency
+- Use descriptive names that explain the test purpose without reading the code
+- Avoid abbreviated or cryptic naming that requires additional context
+
+**Code Quality Standards** [5][6]:
+- Include proper setup/teardown methods to ensure test isolation [18][19][21]
+- Implement realistic mock objects that simulate actual dependencies [18][22]
+- Use data-driven testing patterns where multiple scenarios share logic [12][23]
+- Apply boundary value analysis for numeric and collection inputs [24]
+- Include both positive and negative test scenarios [5][24]
+
+**Coverage Analysis** [16]:
+- Estimate coverage based on statement, branch, and condition coverage techniques
+- Consider cyclomatic complexity when determining test case completeness
+- Account for error handling paths and exception scenarios in coverage calculations
+
+---
+
+### Advanced Testing Considerations:
+
+**Mock Object Strategy** [18][22]:
+- Create mock dependencies that verify interaction patterns
+- Use stubs for predictable return values and mocks for behavior verification
+- Implement proper mock lifecycle with setup and verification phases
+
+**Error Handling Testing** [24]:
+- Test all exception paths and error conditions systematically
+- Verify appropriate error messages and logging
+- Include fault injection scenarios for external dependencies
+- Test recovery mechanisms and fallback logic
+
+**Business Logic Validation** [25]:
+- Align test scenarios with actual business requirements and workflows
+- Test data validation rules and business constraints
+- Verify integrity checks and process timing requirements
+- Include workflow-specific edge cases and boundary conditions
+
+**Test Data Generation** [23][26]:
+- Use realistic, production-like test data while maintaining data privacy
+- Implement data factories or builders for consistent test data creation
+- Include edge cases in test data (empty values, boundary limits, special characters)
+- Reset test data state between test runs for consistency
+
+---
+
+### Quality Assurance Standards:
+
+- Prioritize test maintainability and readability over brevity
+- Ensure each test verifies a single, specific behavior or requirement
+- Include sufficient assertions to validate expected outcomes completely
+- Implement tests that can be executed independently and in any order
+- Design tests to be resilient to minor code changes while catching real regressions
+
+---
+
+### Notes:
+
+- Do not include markdown formatting or explanatory text—**return only the JSON**.
+- Prioritize code quality, readability, and maintainability of test cases.
+- Estimate the coverage based on the logic branches inferred from the content.
+
+---
+Treat this as a test plan for a production-grade CI/CD pipeline. Be thorough, precise, and pragmatic.
+
+Generate a comprehensive test suite that demonstrates senior-level testing expertise and strategic thinking about quality assurance in modern software development.`;
+
+    try {
+      const response = await generateAiResponse(
+        [{ role: "user", content: prompt }],
+        { maxTokens: 4096 }
+      );
+      return parseAiJsonResponse(response);
+    } catch (error) {
+      console.error("AI test generation from structure failed:", error);
+      return this.fallbackTestGenerationFromStructure(language, repositoryName);
+    }
+  }
+
+  async generateComprehensiveDocumentation(
+    parsedData: ProjectStructure,
+    language: string,
+    repositoryName: string
+  ) {
+    const files = parsedData.files.map((file) => ({
+      path: file.path,
+      content: file.content,
+    }));
+
+    const validFiles = files.filter(
+      (f) => f.content && f.content.trim().length > 10
+    );
+    if (validFiles.length === 0) {
+      return this.fallbackComprehensiveDocumentationFromFiles(
+        [],
+        language,
+        repositoryName
+      );
+    }
+
+    const maxFiles = 6;
+    const maxFileContentLength = 2000;
+    const selectedFiles = validFiles.slice(0, maxFiles).map((f) => ({
+      path: f.path,
+      content:
+        f.content.length > maxFileContentLength
+          ? f.content.substring(0, maxFileContentLength) + "\n...(truncated)"
+          : f.content,
+    }));
+
+    let aggregatedContent = `Repository: ${repositoryName}\nLanguage: ${language}\n\n`;
+    for (const file of selectedFiles) {
+      aggregatedContent += `\n=== FILE: ${file.path} ===\n\n${file.content}\n\n=== END FILE ===\n`;
+    }
+
+    const prompt = `You are a senior software architect and documentation expert.
+
+Your task is to analyze the following ${language} codebase and generate a complete Software Design Document (SDD)-level technical documentation report. This documentation will reflect the **real structure, logic, architecture, components, and workflows** present in the repository.
+
+It must be suitable for engineers, architects, QA analysts, and DevOps teams to deeply understand the project design, internals, and implementation details.
+
+---
+
+### Project Details:
+- **Repository**: ${repositoryName}
+- **Files Analyzed**: ${selectedFiles.map((f) => f.path).join(", ")}
+
+\`\`\`${language}
+${aggregatedContent}
+\`\`\`
+
+
+---
+
+### Instructions:
+
+Generate **only valid JSON** in the exact structure below. Every section should be grounded in what is observed in the actual codebase, including component-level specifics, key algorithms, architecture, and development processes.
+
+---
+
+### Expected JSON Structure:
+
+{
+  "summary": "Brief overview of the project",
+  "architecture": {
+    "pattern": "Architecture pattern name (e.g., MVC, Component-based, Microservices)",
+    "description": "Detailed explanation of the chosen architecture and rationale",
+    "technologies": ["tech1", "tech2", "tech3"],
+    "layers": [
+      {
+        "name": "Layer name (e.g., Presentation, Service, Data Access)",
+        "description": "Role and responsibility of the layer",
+        "components": ["component1", "component2"]
+      }
+    ]
+  },
+  "folderStructure": {
+    "tree": "ASCII tree representation of key project folders and files",
+    "directories": [
+      {
+        "path": "folder/path",
+        "type": "source|config|docs|tests",
+        "purpose": "Functional purpose of the folder",
+        "description": "What files exist here and why",
+        "fileCount": 5
+      }
+    ]
+  },
+  "codeInternals": {
+    "codeFlow": "Describe the logical flow of control across modules/functions",
+    "dataFlow": "Describe how data moves and transforms across layers",
+    "keyAlgorithms": [
+      {
+        "name": "Algorithm name",
+        "description": "Core logic of the algorithm",
+        "file": "file/path",
+        "complexity": "Time complexity, e.g., O(n)",
+        "implementation": "Brief code-based explanation of how it's written"
+      }
+    ],
+    "designPatterns": [
+      {
+        "pattern": "Design pattern name (e.g., Singleton, Factory)",
+        "usage": "How and where it's used in the project",
+        "files": ["file1", "file2"],
+        "description": "Why this pattern was chosen"
+      }
+    ],
+    "businessLogic": [
+      {
+        "module": "Module or service name",
+        "purpose": "What this module is responsible for",
+        "workflow": "Explain how it works step by step",
+        "files": ["file1", "file2"]
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Component name",
+      "type": "Component|Service|Utility",
+      "file": "file/path",
+      "description": "Functionality and scope of this component",
+      "dependencies": ["dep1", "dep2"],
+      "exports": ["export1", "export2"],
+      "internals": {
+        "purpose": "Primary function of the component",
+        "keyMethods": ["method1", "method2"],
+        "stateManagement": "How local or global state is handled",
+        "lifecycle": "Lifecycle details (e.g., mount, destroy, request flow)"
+      }
+    }
+  ],
+  "apis": [
+    {
+      "endpoint": "/api/path",
+      "method": "GET|POST|PUT|DELETE",
+      "description": "Functionality provided by this endpoint",
+      "parameters": [
+        {
+          "name": "Parameter name",
+          "type": "string|number|object",
+          "description": "What the parameter represents"
+        }
+      ],
+      "response": "Typical output or structure of the response",
+      "internals": {
+        "implementation": "Explain how the logic is implemented in code",
+        "validation": "Describe how request data is validated",
+        "errorHandling": "How errors are caught and returned",
+        "authentication": "Does this endpoint require auth? If yes, how?"
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "Function or method name",
+      "file": "file/path",
+      "type": "function|method|constructor",
+      "description": "What this function does",
+      "parameters": [
+        {
+          "name": "Parameter name",
+          "type": "type",
+          "description": "What it represents"
+        }
+      ],
+      "returns": {
+        "type": "return type",
+        "description": "Value or structure returned"
+      },
+      "internals": {
+        "algorithm": "If any known algorithm or custom logic used",
+        "complexity": "Time/space complexity if applicable",
+        "sideEffects": "Mutations, external calls, I/O etc.",
+        "dependencies": ["dependency1", "dependency2"]
+      }
+    }
+  ],
+  "dataModels": [
+    {
+      "name": "Model name (e.g., User, Product)",
+      "type": "Interface|Class|Type",
+      "file": "file/path",
+      "properties": [
+        {
+          "name": "Property name",
+          "type": "string|number|boolean|object",
+          "description": "Purpose or usage of the property"
+        }
+      ],
+      "relationships": [
+        {
+          "model": "Related model name",
+          "type": "one-to-one|one-to-many|many-to-many",
+          "description": "How this relationship works"
+        }
+      ],
+      "validation": ["Validation rule 1", "Validation rule 2"]
+    }
+  ],
+  "examples": [
+    {
+      "title": "Title for the example",
+      "description": "What this example demonstrates",
+      "code": "A working code example",
+      "explanation": "How it helps the reader understand the system"
+    }
+  ],
+  "mermaidDiagram": "Mermaid syntax diagram to represent system flow, architecture, or sequence",
+  "sdlc": {
+    "developmentWorkflow": "Overall engineering workflow (e.g., Git flow, branching model, CI)",
+    "setupInstructions": [
+      {
+        "step": 1,
+        "title": "Setup step title",
+        "description": "What this step achieves",
+        "commands": ["command1", "command2"]
+      }
+    ],
+    "buildProcess": {
+      "description": "How the system is built from source to production",
+      "steps": ["Build step 1", "Build step 2"],
+      "tools": ["Webpack", "Docker", "CI Tools"]
+    },
+    "testingStrategy": {
+      "approach": "Testing philosophy or TDD/BDD approach",
+      "testTypes": ["unit", "integration", "e2e"],
+      "coverage": "Expected or current test coverage target (e.g., >80%)",
+      "frameworks": ["Jest", "Mocha", "Cypress", etc.]
+    }
+  }
+}
+
+---
+
+### Constraints:
+- Base your analysis on actual file content only.
+- Return **strictly valid JSON**—no markdown, comments, or extra explanations.
+- Ensure each field is specific, structured, and derived from real code structure and logic.
+- Be precise and helpful, as this document will be used to onboard developers and for architectural reviews.
+
+---
+Treat this like a software design handover for a real engineering team. Be clear, detailed, and accurate.
 `;
 
     try {
-      const result = await generateText({
-        model: this.model,
-        prompt,
-        temperature: 0.4,
-        maxTokens: 3000,
-      });
+      console.log(
+        "🚀 Generating comprehensive documentation for:",
+        repositoryName
+      );
+      console.log(
+        "📁 Files being analyzed:",
+        selectedFiles.map((f) => f.path)
+      );
+      console.log("📝 Prompt length:", prompt.length);
 
-      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      const response = await generateAiResponse(
+        [{ role: "user", content: prompt }],
+        { maxTokens: 8192 }
+      );
+      console.log("✅ AI response received, length:", response.length);
+      console.log("🔄 Parsing AI response...");
+
+      const parsed = parseAiJsonResponse(response);
+
+      // --- ALWAYS use our own folder structure tree formatting ---
+      if (parsed.folderStructure) {
+        parsed.folderStructure.tree = createFolderStructureTree(
+          files,
+          repositoryName
+        );
       }
 
-      // Fallback test structure
-      return {
-        testCases: [
-          {
-            name: "Basic functionality test",
-            type: "unit",
-            priority: "high",
-            description: "Tests core functionality",
-            code: `// Example test case\ntest('should work correctly', () => {\n  expect(true).toBe(true);\n});`
-          }
-        ],
-        coverage: 75,
-        framework: language === "javascript" || language === "typescript" ? "Jest" : "Default"
-      };
+      console.log("✅ Documentation generated successfully!");
+      console.log("📊 Generated data summary:", {
+        hasArchitecture: !!parsed.architecture,
+        hasTechnologies: !!parsed.architecture?.technologies?.length,
+        componentsCount: parsed.components?.length || 0,
+        apisCount: parsed.apis?.length || 0,
+        functionsCount: parsed.functions?.length || 0,
+      });
+
+      return parsed;
     } catch (error) {
-      console.error("Error generating test cases:", error);
-      throw new Error("Failed to generate test cases");
+      console.error(
+        "❌ AI comprehensive documentation generation failed:",
+        error
+      );
+      console.log("🔄 Using fallback documentation...");
+      return this.fallbackComprehensiveDocumentationFromFiles(
+        selectedFiles,
+        language,
+        repositoryName
+      );
     }
   }
+
+  async generateSDDReadme(project: SDDProjectInput): Promise<string> {
+    const prompt = `You are a professional-grade software architect and technical writer with expertise in IEEE 1016 Software Design Description standards and modern documentation practices.
+
+CRITICAL: Return ONLY plain markdown content. Do not wrap in JSON, quotes, or any other format Return the markdown content directly starting with # ${project.name}.
+
+Your task is to generate a complete, structured, GitHub-ready README document that doubles as a Software Design Document (SDD), fully aligned with IEEE 1016 Software Design Description standards [1][2]. This document will serve as both technical documentation and onboarding material for developers, managers, and stakeholders.
+
+You will be provided with structured input fields as follows:
+
+1. Project Name: ${project.name}
+2. Description: ${project.description}
+3. Team Size: ${project.teamSize}
+4. Timeline: ${project.timeline}
+5. Tech Stack: ${project.techStack}
+6. Key Features: ${project.keyFeatures}
+7. Risk Factors: ${project.riskFactors}
+8. Requirements: ${project.requirements}
+9. Additional Context: ${project.additionalContext}
+10. SDLC Model: ${project.sdlcModel}
+
+---
+
+### 📄 IEEE 1016 Compliant Structure:
+
+Generate a comprehensive document that integrates modern README practices [17][18][19] with IEEE 1016 SDD requirements [1][2][3]:
+
+**README Components** (GitHub Best Practices):
+1. Project title with description and badges [20][24]
+2. Features section with emojis and clear value propositions [17][18]
+3. Tech stack with modern badge integration [23]
+4. Installation instructions with prerequisite specifications [19][22]
+5. Usage examples with code snippets and practical demonstrations [19][24]
+6. Project structure with directory tree visualization [17][22]
+7. Development setup with environment configuration [22]
+8. Contributing guidelines following open-source standards [17][18]
+9. License information and legal compliance [19][22]
+10. Contact/support information with communication channels [20]
+
+**SDD Components** (IEEE 1016 Compliance):
+
+### 1. Introduction
+- **Purpose**: Document scope aligned with IEEE 1016 requirements for SDD information content and organization [1][2]
+- **Scope**: Software functionality boundaries, goals, and stakeholder identification [3][6]
+- **Overview**: Document structure following IEEE 1016 design entity framework [4]
+- **References**: Standards compliance (IEEE 1016), APIs, libraries, and technical specifications [1][5]
+- **Definitions**: Domain-specific terminology, acronyms, and technical glossary [2][8]
+
+### 2. System Overview
+- High-level system functionality summary addressing IEEE 1016 design concerns [3][6]
+- User roles, system boundaries, and major architectural goals [6][7]
+- Business context and stakeholder value proposition [6]
+
+### 3. System Architecture
+- System decomposition following IEEE 1016 design entity attributes [4]
+- **Mermaid.js diagrams** with accurate syntax and appropriate diagram selection [9][11][16]:
+  - **Architecture diagrams** for service relationships using architecture-beta syntax [9][11][16]
+  - **Flowcharts** for process workflows using flowchart TD/LR syntax [25][28][31]
+  - **Sequence diagrams** for component interactions using sequenceDiagram syntax [30][31]
+  - **Component diagrams** for system structure visualization [13][14]
+- Architectural decision rationale covering scalability, maintainability, and security [6][7]
+
+### 4. Data Design
+- Data structure and storage model aligned with IEEE 1016 data design requirements [7]
+- **Data dictionary** with entity definitions, field specifications, and relationship mappings [3][7]
+- Data flow patterns and persistence strategies [6]
+
+### 5. Component Design
+- IEEE 1016 compliant component specifications [4]:
+  - Component responsibility and purpose definition
+  - Input/output interface specifications
+  - **Program Design Language (PDL)** or structured pseudocode [3][7]
+- Component interaction patterns and dependency management [4]
+
+### 6. Human Interface Design
+- User interaction patterns and interface specifications [3][7]
+- **UI layout descriptions** with Mermaid flowchart representations where applicable [25][28]
+- Accessibility compliance and internationalization considerations [20]
+
+### 7. Requirements Matrix
+- **Traceability matrix** mapping functional/non-functional requirements to features and components [3][6]
+- Requirements verification and validation approach [2][3]
+
+### 8. Appendices
+- External documentation references (API specifications, design documents) [1][2]
+- **Additional Mermaid diagrams** for complex system interactions [11][13]
+- Environment setup and deployment configurations [7][22]
+- Third-party service integrations and external dependencies [6]
+
+---
+
+### 🎯 Enhanced Guidelines:
+
+**Mermaid Diagram Accuracy** [9][11][16]:
+- Use **architecture-beta** syntax for modern service architecture visualization [9][11][16]
+- Apply **flowchart TD/LR** for process flows with proper node shapes and connections [25][28]
+- Implement **sequenceDiagram** for component interactions with participant definitions [30][31]
+- Include **graph TD/LR** for component relationships and data flow representation [14][25]
+- Ensure diagram complexity matches project scope - avoid unnecessary visualizations [11][13]
+
+**Professional Documentation Standards** [17][18][19]:
+- Maintain consistent markdown formatting with proper heading hierarchy [21][22]
+- Include contextually appropriate badges using shields.io integration [23]
+- Provide executable code examples with clear setup instructions [19][24]
+- Structure content for both technical and managerial audiences [6][20]
+
+**IEEE 1016 Compliance Requirements** [1][2][4]:
+- Address all mandatory design entity attributes: identity, type, purpose, function, dependencies, interface, resources, processing, and data [4]
+- Ensure design viewpoint organization facilitates stakeholder access to relevant information [1][4]
+- Maintain consistency between design description and implementation [2][3]
+
+**Context-Aware Content Generation**:
+- Tailor diagram complexity to project size and team requirements
+- Select appropriate Mermaid diagram types based on system architecture
+- Scale documentation depth according to SDLC model and project timeline
+- Integrate risk factors into architectural decision documentation
+
+---
+
+### 🔄 Output Requirements:
+
+- Generate **complete markdown content** starting with # \${project.name}
+- Ensure **IEEE 1016 compliance** while maintaining GitHub README usability [1][2][17]
+- Include **accurate Mermaid diagrams** with proper syntax validation [9][11][25]
+- Provide **actionable documentation** suitable for development teams and stakeholders [6][20]
+- Maintain **professional technical writing standards** throughout the document [24]
+
+Generate this comprehensive SDD/README hybrid document that serves as both practical development documentation and formal software design specification, ensuring compliance with IEEE 1016 standards while following modern GitHub documentation best practices.`;
+
+    try {
+      const response = await generateAiResponse(
+        [{ role: "user", content: prompt }],
+        { maxTokens: 8192 }
+      );
+
+      console.log("🔍 AI SDD/README Response Debug:");
+      console.log("- Type:", typeof response);
+      console.log("- Length:", response.length);
+      console.log("- First 300 chars:", response.substring(0, 300));
+      console.log("- Starts with JSON?:", response.trim().startsWith("{"));
+      console.log(
+        "- Contains README.md key?:",
+        response.includes('"README.md"')
+      );
+
+      // Check if the response is JSON-wrapped and extract content if needed
+      let cleanResponse = response.trim();
+
+      if (
+        cleanResponse.startsWith("{") &&
+        cleanResponse.includes('"README.md"')
+      ) {
+        console.log(
+          "⚠️ Detected JSON-wrapped response, extracting markdown content..."
+        );
+        try {
+          const parsed = JSON.parse(cleanResponse);
+          if (parsed["README.md"]) {
+            cleanResponse = parsed["README.md"];
+            console.log("✅ Successfully extracted markdown from JSON wrapper");
+          }
+        } catch {
+          console.log(
+            "❌ Failed to parse JSON wrapper, using original response"
+          );
+        }
+      }
+
+      // This is a Markdown document, so just return as string
+      return cleanResponse;
+    } catch (error) {
+      console.error("AI SDD/README generation failed:", error);
+      throw new Error("Could not generate SDD/README from AI.");
+    }
+  }
+
+  private fallbackSDLCRecommendation(projectData: ProjectData) {
+    const complexity = projectData.complexity.toLowerCase();
+    const teamSize = parseInt(projectData.teamSize) || 1;
+
+    let recommended = "Agile";
+    let phases = ["Planning", "Development", "Testing", "Review", "Deployment"];
+
+    if (complexity.includes("high") && teamSize > 10) {
+      recommended = "Scrum";
+      phases = [
+        "Sprint Planning",
+        "Daily Standups",
+        "Development",
+        "Sprint Review",
+        "Sprint Retrospective",
+      ];
+    } else if (complexity.includes("low") && teamSize < 5) {
+      recommended = "Kanban";
+      phases = ["Backlog", "To Do", "In Progress", "Testing", "Done"];
+    }
+
+    return {
+      recommended,
+      reasoning: `Based on ${projectData.complexity} complexity and ${projectData.teamSize} team size, ${recommended} methodology is recommended.`,
+      phases,
+      alternatives: [
+        {
+          model: "Waterfall",
+          suitability: 60,
+          pros: ["Clear phases", "Well-documented"],
+          cons: ["Less flexible", "Late feedback"],
+        },
+        {
+          model: "DevOps",
+          suitability: 75,
+          pros: ["Continuous delivery", "Automation"],
+          cons: ["Complex setup", "Cultural change required"],
+        },
+      ],
+    };
+  }
+
+  private fallbackStructureAnalysis(structure: ProjectStructure) {
+    const score = Math.max(
+      30,
+      Math.min(
+        90,
+        structure.testCoverage * 0.3 +
+          Math.min(structure.complexity.average, 10) * 5 +
+          (structure.totalFiles > 0 ? 20 : 0)
+      )
+    );
+
+    return {
+      qualityScore: Math.round(score),
+      strengths: [
+        `Project contains ${structure.totalFiles} files with ${structure.totalLines} lines of code`,
+        `Test coverage at ${structure.testCoverage}%`,
+        `Uses ${structure.patterns.framework.join(", ")} framework`,
+      ],
+      weaknesses: [
+        structure.testCoverage < 80 ? "Test coverage could be improved" : "",
+        structure.complexity.average > 5
+          ? "Code complexity is above average"
+          : "",
+        structure.issues.length > 0
+          ? `${structure.issues.length} issues detected`
+          : "",
+      ].filter(Boolean),
+      recommendations: [
+        "Increase test coverage for better reliability",
+        "Consider refactoring complex functions",
+        "Add more documentation for maintainability",
+      ],
+      maintainabilityIndex: Math.round(score * 0.8),
+    };
+  }
+
+  private fallbackTestGeneration(language: string) {
+    const frameworks = {
+      javascript: "Jest",
+      typescript: "Jest",
+      python: "pytest",
+      java: "JUnit",
+      csharp: "NUnit",
+      go: "testing",
+      rust: "cargo test",
+    };
+
+    const framework =
+      frameworks[language.toLowerCase() as keyof typeof frameworks] || "Jest";
+
+    return {
+      testCases: [
+        {
+          name: "Basic Functionality Test",
+          description: `Basic test for ${language} file (AI unavailable)`,
+          code: `// ${framework} test template\n// Add your test implementation here`,
+          type: "unit" as const,
+          priority: "medium" as const,
+        },
+        {
+          name: "Error Handling Test",
+          description: "Test error conditions and edge cases",
+          code: `// Test error scenarios\n// Verify proper error handling`,
+          type: "unit" as const,
+          priority: "high" as const,
+        },
+      ],
+      coverage: 75,
+      framework,
+    };
+  }
+
+  private fallbackTestGenerationFromStructure(
+    language: string,
+    repositoryName: string
+  ) {
+    const frameworks = {
+      javascript: "Jest",
+      typescript: "Jest",
+      python: "pytest",
+      java: "JUnit",
+      csharp: "NUnit",
+      go: "testing",
+      rust: "cargo test",
+    };
+
+    const framework =
+      frameworks[language.toLowerCase() as keyof typeof frameworks] || "Jest";
+
+    return {
+      testCases: [
+        {
+          name: "Repository Integration Test",
+          description: `Integration test for ${repositoryName} (AI unavailable)`,
+          code: `// ${framework} integration test template\n// Test main application flow`,
+          type: "integration" as const,
+          priority: "high" as const,
+          file: "main application file",
+        },
+        {
+          name: "Core Functionality Unit Test",
+          description: "Unit test for core functionality",
+          code: `// ${framework} unit test template\n// Test individual components`,
+          type: "unit" as const,
+          priority: "medium" as const,
+          file: "core component files",
+        },
+      ],
+      coverage: 70,
+      framework,
+      summary: `Basic test strategy for ${repositoryName} using ${framework}. AI-powered analysis unavailable.`,
+    };
+  }
+
+  private fallbackDocumentationGeneration(filePath: string, language: string) {
+    return {
+      summary: `${language} file located at ${filePath}. AI-powered analysis is currently unavailable, but this file appears to be part of the application's core functionality.`,
+      functions: [
+        {
+          name: "main",
+          description: "Main function (inferred from file structure)",
+          parameters: [],
+          returns: {
+            type: "void",
+            description: "No return value",
+          },
+        },
+      ],
+      examples: [
+        `// Example usage of ${filePath}\n// Please refer to the actual file for implementation details`,
+      ],
+    };
+  }
+
+  private fallbackComprehensiveDocumentationFromFiles(
+    files: Array<{ path: string; content: string }>,
+    language: string,
+    repositoryName: string
+  ) {
+    const fileList =
+      files.length > 0
+        ? files.map((f) => f.path).join(", ")
+        : "No files available";
+
+    return {
+      summary: `${repositoryName} is a ${language} application. AI-powered analysis is currently unavailable, but the codebase includes the following files: ${fileList}`,
+      architecture: {
+        pattern: "Component-based Architecture",
+        description: `The application follows a ${language} component-based architecture with clear separation of concerns.`,
+        technologies: [language, "Modern Development Stack"],
+        layers: [
+          {
+            name: "Presentation Layer",
+            description: "User interface and presentation logic",
+            components: files
+              .filter((f) => f.path.includes("component"))
+              .map((f) => f.path),
+          },
+          {
+            name: "Business Logic Layer",
+            description: "Core application logic and business rules",
+            components: files
+              .filter(
+                (f) => f.path.includes("service") || f.path.includes("lib")
+              )
+              .map((f) => f.path),
+          },
+          {
+            name: "Data Layer",
+            description: "Data access and management",
+            components: files
+              .filter(
+                (f) => f.path.includes("model") || f.path.includes("interface")
+              )
+              .map((f) => f.path),
+          },
+        ],
+      },
+      folderStructure: {
+        tree: createFolderStructureTree(files, repositoryName),
+        directories: [
+          {
+            path: "src/",
+            purpose: "Main source code directory",
+            type: "source" as const,
+            fileCount: files.filter((f) => f.path.startsWith("src/")).length,
+            description:
+              "Contains the main application source code including components, services, and utilities",
+          },
+        ],
+      },
+      codeInternals: {
+        codeFlow: `The application follows a standard ${language} execution flow with initialization, main processing, and cleanup phases.`,
+        keyAlgorithms: [
+          {
+            name: "Standard Processing",
+            description: "Basic application processing logic",
+            file: "main application file",
+            complexity: "O(n)",
+            implementation: "Standard implementation patterns",
+          },
+        ],
+        designPatterns: [
+          {
+            pattern: "Module Pattern",
+            usage: "Used for organizing code into reusable modules",
+            files: files.map((f) => f.path),
+            description: "Better code organization and maintainability",
+          },
+        ],
+        dataFlow:
+          "Data flows from input through processing layers to output with validation at each stage",
+        businessLogic: [
+          {
+            module: "Core Application",
+            purpose: "Main application functionality",
+            workflow: "Standard processing workflow",
+            files: files.map((f) => f.path),
+          },
+        ],
+      },
+      sdlc: {
+        developmentWorkflow:
+          "Standard development workflow with version control, code review, and continuous integration",
+        setupInstructions: [
+          {
+            step: 1,
+            title: "Clone Repository",
+            description: "Clone the repository to your local machine",
+            commands: ["git clone <repository-url>"],
+          },
+          {
+            step: 2,
+            title: "Install Dependencies",
+            description: "Install project dependencies",
+            commands: ["npm install", "yarn install"],
+          },
+        ],
+        buildProcess: {
+          description: `Standard ${language} build process`,
+          steps: [
+            "Install dependencies",
+            "Run build command",
+            "Generate output",
+          ],
+          tools: ["Package manager", "Build tools", "Bundler"],
+        },
+        testingStrategy: {
+          approach: "Unit testing with integration tests",
+          testTypes: ["unit", "integration", "e2e"],
+          coverage: "Target 80%+ code coverage",
+          frameworks: ["Standard testing framework"],
+        },
+        deploymentGuide: {
+          process: "Automated deployment through CI/CD pipeline",
+          environments: ["development", "staging", "production"],
+          steps: [
+            {
+              environment: "development",
+              steps: [
+                "Build application",
+                "Run tests",
+                "Deploy to dev environment",
+              ],
+            },
+          ],
+        },
+        maintenance: {
+          guidelines: [
+            "Regular code reviews",
+            "Keep dependencies updated",
+            "Monitor performance",
+          ],
+          monitoring: [
+            "Application logs",
+            "Performance metrics",
+            "Error tracking",
+          ],
+          troubleshooting: [
+            {
+              issue: "Application not starting",
+              solution:
+                "Check logs for errors and verify environment configuration",
+            },
+          ],
+        },
+      },
+      components: files.map((f) => ({
+        name: f.path.split("/").pop() || f.path,
+        type: f.path.includes("component") ? "Component" : "File",
+        file: f.path,
+        description: "Component/file in the codebase",
+        dependencies: [] as string[],
+        exports: [] as string[],
+        internals: {
+          purpose: "Core application functionality",
+          keyMethods: ["main", "init", "process"],
+          stateManagement: "Local state management",
+          lifecycle: "Standard lifecycle",
+        },
+      })),
+      apis: [
+        {
+          endpoint: "/api/health",
+          method: "GET",
+          description: "Health check endpoint",
+          parameters: [],
+          response: '{ "status": "ok" }',
+          internals: {
+            implementation: "Health controller",
+            validation: "Basic validation",
+            errorHandling: "Standard error handling",
+            authentication: "No authentication required",
+          },
+        },
+      ],
+      functions: [
+        {
+          name: "main",
+          file: "main application file",
+          type: "function",
+          description: "Main application entry point",
+          parameters: [],
+          returns: {
+            type: "void",
+            description: "No return value",
+          },
+          internals: {
+            algorithm: "Simple initialization and startup",
+            complexity: "O(1)",
+            sideEffects: "None",
+            dependencies: [],
+          },
+        },
+      ],
+      dataModels: [
+        {
+          name: "ApplicationConfig",
+          type: "Interface",
+          file: "config file",
+          properties: [
+            {
+              name: "environment",
+              type: "string",
+              description: "Application environment",
+            },
+          ],
+          relationships: [],
+          validation: ["Required field validation"],
+        },
+      ],
+      mermaidDiagram:
+        "graph TD\nA[User] --> B[" +
+        repositoryName +
+        " Application]\nB --> C[Business Logic]\nC --> D[Data Layer]",
+      examples: [
+        {
+          title: "Basic Usage",
+          description: "How to use the main application",
+          code: `// Example usage\n// Initialize application\n// Process data\n// Return results`,
+          explanation: "This shows the basic application flow",
+        },
+      ],
+    };
+  }
+
+  private isCodeFile(filePath: string): boolean {
+    if (!filePath) return false;
+
+    const excludedExtensions = [
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".bmp",
+      ".svg",
+      ".ico",
+      ".webp",
+      ".mp4",
+      ".avi",
+      ".mov",
+      ".wmv",
+      ".mp3",
+      ".wav",
+      ".pdf",
+      ".doc",
+      ".zip",
+      ".rar",
+      ".7z",
+      ".tar",
+      ".gz",
+      ".ttf",
+      ".otf",
+      ".woff",
+      ".exe",
+      ".dll",
+      ".so",
+      ".db",
+      ".sqlite",
+      ".log",
+      ".tmp",
+      ".lock",
+      ".map",
+    ];
+
+    const excludedDirectories = [
+      "node_modules/",
+      "dist/",
+      "build/",
+      "target/",
+      "bin/",
+      "obj/",
+      ".git/",
+      ".vscode/",
+      ".idea/",
+      "__pycache__/",
+      "coverage/",
+      "vendor/",
+      "assets/images/",
+      "static/images/",
+      "images/",
+      "img/",
+    ];
+
+    const codeExtensions = [
+      ".js",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".vue",
+      ".svelte",
+      ".html",
+      ".css",
+      ".scss",
+      ".sass",
+      ".py",
+      ".java",
+      ".c",
+      ".cpp",
+      ".cs",
+      ".php",
+      ".rb",
+      ".go",
+      ".rs",
+      ".kt",
+      ".swift",
+      ".sh",
+      ".json",
+      ".yaml",
+      ".yml",
+      ".xml",
+      ".md",
+      ".txt",
+    ];
+
+    const lowerPath = filePath.toLowerCase();
+
+    for (const dir of excludedDirectories) {
+      if (lowerPath.includes(dir)) return false;
+    }
+    for (const ext of excludedExtensions) {
+      if (lowerPath.endsWith(ext)) return false;
+    }
+
+    for (const ext of codeExtensions) {
+      if (lowerPath.endsWith(ext)) return true;
+    }
+
+    return false;
+  }
+}
+
+// Utility function to create a properly formatted folder structure tree
+function createFolderStructureTree(
+  files: Array<{ path: string; content: string }>,
+  repositoryName: string
+): string {
+  if (!files || files.length === 0) {
+    return `${repositoryName}/\n└── (empty)`;
+  }
+
+  // Group files by directory
+  const structure: Record<string, string[]> = {};
+  const directories = new Set<string>();
+
+  files.forEach((file) => {
+    const parts = file.path.split("/");
+    let currentPath = "";
+
+    // Add all directory levels
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
+      directories.add(currentPath);
+    }
+
+    // Add file to its directory
+    const dir = parts.slice(0, -1).join("/") || ".";
+    const fileName = parts[parts.length - 1];
+
+    if (!structure[dir]) {
+      structure[dir] = [];
+    }
+    structure[dir].push(fileName);
+  });
+
+  // Sort directories and files
+  const sortedDirs = Array.from(directories).sort();
+  Object.keys(structure).forEach((dir) => {
+    structure[dir].sort();
+  });
+
+  // Build tree string
+  let tree = `${repositoryName}/\n`;
+  const allPaths = [
+    ...sortedDirs,
+    ...Object.keys(structure).filter((dir) => dir !== "."),
+  ];
+  const uniquePaths = [...new Set(allPaths)].sort();
+
+  // Add root files first
+  if (structure["."]) {
+    structure["."].forEach((file, index) => {
+      const isLast =
+        index === structure["."].length - 1 && uniquePaths.length === 0;
+      tree += `${isLast ? "└── " : "├── "}${file}\n`;
+    });
+  }
+
+  // Add directories and their contents
+  uniquePaths.forEach((path, pathIndex) => {
+    if (path === ".") return;
+
+    const isLastPath = pathIndex === uniquePaths.length - 1;
+    const depth = path.split("/").length;
+    const indent = "│   ".repeat(depth - 1);
+    const connector = isLastPath ? "└── " : "├── ";
+    const dirName = path.split("/").pop();
+
+    tree += `${indent}${connector}${dirName}/\n`;
+
+    // Add files in this directory
+    if (structure[path]) {
+      structure[path].forEach((file, fileIndex) => {
+        const isLastFile = fileIndex === structure[path].length - 1;
+        const fileIndent = isLastPath
+          ? "    ".repeat(depth)
+          : "│   ".repeat(depth);
+        const fileConnector = isLastFile ? "└── " : "├── ";
+        tree += `${fileIndent}${fileConnector}${file}\n`;
+      });
+    }
+  });
+
+  return tree.trim();
 }
