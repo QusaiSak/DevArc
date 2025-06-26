@@ -58,7 +58,7 @@ export const Navbar = () => {
   };
 
   return (
-    <motion.nav 
+    <motion.nav
       className="w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 sticky top-0 z-50 shadow-sm"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
@@ -67,19 +67,14 @@ export const Navbar = () => {
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
         <div className="flex items-center justify-between h-12">
           {/* Logo Section */}
-          <motion.div 
+          <motion.div
             className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0"
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.2 }}
           >
-            <motion.div 
-              className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg"
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.8 }}
-            >
-              <Rocket className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
-            </motion.div>
-            <motion.span 
+            <Rocket className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+
+            <motion.span
               className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -103,7 +98,7 @@ export const Navbar = () => {
                   className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-all duration-300 relative group py-2 px-1"
                 >
                   {item.label}
-                  <motion.span 
+                  <motion.span
                     className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-600 group-hover:w-full transition-all duration-300 ease-out"
                     layoutId={`underline-${index}`}
                   />

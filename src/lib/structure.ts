@@ -34,9 +34,12 @@ export class StructureAnalyzer {
       // Debug: Log first few files
       console.log(
         "Sample files:",
-        files
-          .slice(0, 10)
-          .map((f) => ({ name: f.name, type: f.type, size: f.size }))
+        files.slice(0, 10).map((f) => ({
+          name: f.name,
+          type: f.type,
+          size: f.size,
+          path: f.path,
+        }))
       );
 
       const codeFiles = files.filter((file) => {
@@ -52,10 +55,13 @@ export class StructureAnalyzer {
         const shouldInclude =
           isFile && notIgnored && hasSize && notTooLarge && notBinary;
 
-        // Debug logging for first few files
-        if (files.indexOf(file) < 5) {
+        // Enhanced debug logging - especially for backend/frontend files
+        const isBackendFrontend =
+          fileName.toLowerCase().includes("backend") ||
+          fileName.toLowerCase().includes("frontend");
+        if (isBackendFrontend || files.indexOf(file) < 5) {
           console.log(
-            `File: ${file.name}, isFile: ${isFile}, notIgnored: ${notIgnored}, hasSize: ${hasSize}, notTooLarge: ${notTooLarge}, notBinary: ${notBinary}, shouldInclude: ${shouldInclude}`
+            `File: ${fileName}, isFile: ${isFile}, notIgnored: ${notIgnored}, hasSize: ${hasSize}, notTooLarge: ${notTooLarge}, notBinary: ${notBinary}, shouldInclude: ${shouldInclude}`
           );
         }
 
@@ -240,14 +246,35 @@ export class StructureAnalyzer {
 
     // If it's a code file, only ignore if it's in an ignored directory
     if (hasCodeExtension) {
-      return ignoredDirs.some((dir) => fileName.includes(dir));
+      const isInIgnoredDir = ignoredDirs.some((dir) => fileName.includes(dir));
+
+      // Debug logging for backend/frontend files
+      if (
+        fileName.toLowerCase().includes("backend") ||
+        fileName.toLowerCase().includes("frontend")
+      ) {
+        console.log(`Checking ignored dir for ${fileName}: ${isInIgnoredDir}`);
+      }
+
+      return isInIgnoredDir;
     }
 
-    return (
+    const shouldIgnore =
       ignoredExtensions.some((ext) => fileName.toLowerCase().endsWith(ext)) ||
       ignoredFiles.includes(fileName) ||
-      ignoredDirs.some((dir) => fileName.includes(dir))
-    );
+      ignoredDirs.some((dir) => fileName.includes(dir));
+
+    // Debug logging for backend/frontend files
+    if (
+      fileName.toLowerCase().includes("backend") ||
+      fileName.toLowerCase().includes("frontend")
+    ) {
+      console.log(
+        `File ${fileName} ignored: ${shouldIgnore} (hasCodeExtension: ${hasCodeExtension})`
+      );
+    }
+
+    return shouldIgnore;
   }
 
   private buildProjectStructure(
@@ -341,6 +368,11 @@ export class StructureAnalyzer {
       directories,
       patterns,
       files: parsedFiles,
+      allFiles: allFiles.map((file) => ({
+        path: file.path,
+        name: file.name,
+        type: file.type,
+      })),
     };
   }
 

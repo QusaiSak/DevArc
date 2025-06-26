@@ -64,6 +64,7 @@ export interface ProjectStructure {
     patterns: string[];
   };
   files: ParsedFile[];
+  allFiles?: Array<{ path: string; name: string; type: string }>; // All repository files for complete folder structure
 }
 
 export interface DirectoryInfo {

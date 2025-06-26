@@ -1,6 +1,7 @@
 import type { ParsedFile } from "@/types/codeparser.interface";
 
 export class CodeParser {
+  // Keep this method - it's used by StructureAnalyzer
   parseFile(filePath: string, content: string): ParsedFile {
     // Handle binary files and very large files
     if (this.isBinaryFile(filePath) || content.length > 5000000) {

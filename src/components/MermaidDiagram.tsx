@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
+import { validateAndFixMermaidDiagram } from "@/lib/aiService";
 
 interface MermaidDiagramProps {
   chart: string;
@@ -88,7 +89,7 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => {
         id || `mermaid-${Math.random().toString(36).substr(2, 9)}`;
 
       // Clean and validate the chart syntax
-      const cleanChart = chart.trim();
+      const cleanChart = validateAndFixMermaidDiagram(chart);
 
       // Basic validation for common issues
       if (!cleanChart) {

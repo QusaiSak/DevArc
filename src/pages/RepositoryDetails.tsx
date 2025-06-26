@@ -13,7 +13,10 @@ import {
   addFavorite,
   removeFavorite,
 } from "@/lib/favoritesService";
-import type { ComprehensiveDocumentation } from "@/types/codeparser.interface";
+import type {
+  ComprehensiveDocumentation,
+  ProjectStructure,
+} from "@/types/codeparser.interface";
 import { toast } from "sonner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import {
@@ -25,6 +28,7 @@ import {
   CommitsTab,
   OverviewTab,
 } from "@/components/repository";
+import { ParsingLoader } from "@/components/ui/ParsingLoader";
 
 interface RepositoryData {
   id: number;
@@ -61,19 +65,8 @@ interface CommitData {
   html_url: string;
 }
 
-interface GitHubCommitsResponse {
-  data?: CommitData[];
-}
-
 interface AnalysisResults {
-  structure?: {
-    totalFiles: number;
-    totalLines: number;
-    testCoverage: number;
-    complexity: {
-      average: number;
-    };
-  };
+  structure?: ProjectStructure;
   codeAnalysis?: {
     qualityScore: number;
     strengths: string[];
@@ -100,118 +93,41 @@ export default function RepositoryDetailsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Repository data states
   const [repository, setRepository] = useState<RepositoryData | null>(null);
   const [readme, setReadme] = useState<string>("");
-  const [commits, setCommits] = useState<
-    Array<{
-      sha: string;
-      commit: {
-        message: string;
-        author: {
-          name: string;
-          date: string;
-        };
-      };
-      html_url: string;
-    }>
-  >([]);
+  const [commits, setCommits] = useState<CommitData[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Analysis states
   const [analysis, setAnalysis] = useState<AnalysisResults>({});
-  const [loading, setLoading] = useState(true);
+  const [parsedStructure, setParsedStructure] =
+    useState<ProjectStructure | null>(null);
+
+  // Loading states
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isParsing, setIsParsing] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [generatingDocs, setGeneratingDocs] = useState(false);
   const [generatingTests, setGeneratingTests] = useState(false);
+
+  // Error states
   const [error, setError] = useState<string | null>(null);
+  const [parsingError, setParsingError] = useState<string | null>(null);
+
+  // UI state
   const [activeTab, setActiveTab] = useState("overview");
-  const [isFavorite, setIsFavorite] = useState(false);
 
-  // Check if project is favorite and load stored analysis
+  // Fetch repository data and start parsing immediately
   useEffect(() => {
-    if (owner && repo && user && repository) {
-      const projectId = `${owner}/${repo}`;
+    if (!owner || !repo) return;
 
-      // Check if project is favorite using repository.id
-      checkIsFavorite(user.id, repository.id.toString())
-        .then(setIsFavorite)
-        .catch(console.error);
-
-      // Load stored analysis if available
-      getAnalysis(user.id, projectId)
-        .then(({ analysis }) => {
-          try {
-            if (analysis.structure) {
-              const parsedStructure =
-                typeof analysis.structure === "string"
-                  ? JSON.parse(analysis.structure)
-                  : analysis.structure;
-              setAnalysis((prev) => ({
-                ...prev,
-                structure: parsedStructure,
-              }));
-            }
-          } catch (e) {
-            console.warn("Failed to parse structure analysis:", e);
-          }
-
-          try {
-            if (analysis.codeAnalysis) {
-              const parsedCodeAnalysis =
-                typeof analysis.codeAnalysis === "string"
-                  ? JSON.parse(analysis.codeAnalysis)
-                  : analysis.codeAnalysis;
-              setAnalysis((prev) => ({
-                ...prev,
-                codeAnalysis: parsedCodeAnalysis,
-              }));
-            }
-          } catch (e) {
-            console.warn("Failed to parse code analysis:", e);
-          }
-
-          try {
-            if (analysis.documentation) {
-              const parsedDocumentation =
-                typeof analysis.documentation === "string"
-                  ? JSON.parse(analysis.documentation)
-                  : analysis.documentation;
-              setAnalysis((prev) => ({
-                ...prev,
-                documentation: parsedDocumentation,
-              }));
-            }
-          } catch (e) {
-            console.warn("Failed to parse documentation analysis:", e);
-          }
-
-          try {
-            if (analysis.testCases) {
-              const parsedTestCases =
-                typeof analysis.testCases === "string"
-                  ? JSON.parse(analysis.testCases)
-                  : analysis.testCases;
-              setAnalysis((prev) => ({
-                ...prev,
-                testCases: parsedTestCases,
-              }));
-            }
-          } catch (e) {
-            console.warn("Failed to parse test cases analysis:", e);
-          }
-        })
-        .catch(() => {
-          // No stored analysis found, that's ok
-        });
-    }
-  }, [owner, repo, user, repository]);
-
-  // Fetch repository data
-  useEffect(() => {
-    const fetchRepositoryData = async () => {
-      if (!owner || !repo) return;
-
-      setLoading(true);
+    const initializeRepository = async () => {
+      setInitialLoading(true);
       setError(null);
 
       try {
+        // Get GitHub token
         const tokenResponse = await fetch(
           "http://localhost:4000/api/github-token",
           {
@@ -219,9 +135,14 @@ export default function RepositoryDetailsPage() {
           }
         );
 
+        if (!tokenResponse.ok) {
+          throw new Error("Failed to authenticate with GitHub");
+        }
+
         const tokenData = await tokenResponse.json();
         const githubService = new GitHubService(tokenData.access_token);
 
+        // Fetch repository data
         const repoData = (await githubService.fetch(
           `repos/${owner}/${repo}`
         )) as RepositoryData;
@@ -233,6 +154,7 @@ export default function RepositoryDetailsPage() {
           setReadme(readmeContent);
         } catch (readmeError) {
           console.log("No README found:", readmeError);
+          setReadme("");
         }
 
         // Fetch commits
@@ -240,28 +162,11 @@ export default function RepositoryDetailsPage() {
           const commitsData = await githubService.fetch(
             `repos/${owner}/${repo}/commits?per_page=10`
           );
-
-          // Handle both direct array response and response object with data property
-          let commitsArray: CommitData[] = [];
-          if (Array.isArray(commitsData)) {
-            commitsArray = commitsData as CommitData[];
-          } else if (
-            commitsData &&
-            typeof commitsData === "object" &&
-            "data" in commitsData &&
-            Array.isArray((commitsData as GitHubCommitsResponse).data)
-          ) {
-            commitsArray = (commitsData as GitHubCommitsResponse).data || [];
-          } else {
-            console.warn(
-              "Commits data is not in expected format:",
-              commitsData
-            );
-            commitsArray = [];
-          }
-
+          const commitsArray = Array.isArray(commitsData)
+            ? commitsData
+            : (commitsData as any)?.data || [];
           setCommits(
-            commitsArray.map((commit: CommitData) => ({
+            commitsArray.map((commit: any) => ({
               sha: commit.sha || "",
               commit: {
                 message: commit.commit?.message || "",
@@ -275,67 +180,291 @@ export default function RepositoryDetailsPage() {
           );
         } catch (commitsError) {
           console.log("Could not fetch commits:", commitsError);
-          setCommits([]); // Ensure commits is always an array
+          setCommits([]);
         }
-      } catch (error) {
-        console.error("Failed to fetch repository data:", error);
-        setError("Failed to load repository data");
+
+        // Check if favorite (only if user is logged in)
+        if (user?.id) {
+          try {
+            const favoriteStatus = await checkIsFavorite(
+              user.id,
+              repoData.id.toString()
+            );
+            setIsFavorite(favoriteStatus);
+          } catch (favoriteError) {
+            console.error("Failed to check favorite status:", favoriteError);
+          }
+
+          // Load stored analysis if available
+          try {
+            const projectId = `${owner}/${repo}`;
+            const { analysis: storedAnalysis } = await getAnalysis(
+              user.id,
+              projectId
+            );
+
+            // Parse stored analysis data
+            if (storedAnalysis) {
+              const parsedAnalysis: AnalysisResults = {};
+              let hasStoredStructure = false;
+
+              if (storedAnalysis.structure) {
+                try {
+                  parsedAnalysis.structure =
+                    typeof storedAnalysis.structure === "string"
+                      ? JSON.parse(storedAnalysis.structure)
+                      : storedAnalysis.structure;
+                  hasStoredStructure = true;
+                } catch (e) {
+                  console.warn("Failed to parse stored structure:", e);
+                }
+              }
+
+              if (storedAnalysis.codeAnalysis) {
+                try {
+                  parsedAnalysis.codeAnalysis =
+                    typeof storedAnalysis.codeAnalysis === "string"
+                      ? JSON.parse(storedAnalysis.codeAnalysis)
+                      : storedAnalysis.codeAnalysis;
+                } catch (e) {
+                  console.warn("Failed to parse stored code analysis:", e);
+                }
+              }
+
+              if (storedAnalysis.documentation) {
+                try {
+                  parsedAnalysis.documentation =
+                    typeof storedAnalysis.documentation === "string"
+                      ? JSON.parse(storedAnalysis.documentation)
+                      : storedAnalysis.documentation;
+                } catch (e) {
+                  console.warn("Failed to parse stored documentation:", e);
+                }
+              }
+
+              if (storedAnalysis.testCases) {
+                try {
+                  parsedAnalysis.testCases =
+                    typeof storedAnalysis.testCases === "string"
+                      ? JSON.parse(storedAnalysis.testCases)
+                      : storedAnalysis.testCases;
+                } catch (e) {
+                  console.warn("Failed to parse stored test cases:", e);
+                }
+              }
+
+              setAnalysis(parsedAnalysis);
+
+              // If we have stored structure, use it as parsed structure
+              if (hasStoredStructure && parsedAnalysis.structure) {
+                setParsedStructure(parsedAnalysis.structure);
+                console.log(
+                  "Using cached repository structure - skipping re-parsing"
+                );
+                // Don't parse again if we have cached structure
+                setInitialLoading(false);
+                return;
+              }
+            }
+          } catch (analysisError) {
+            console.log("No stored analysis found:", analysisError);
+          }
+        }
+
+        // Start parsing repository structure immediately (only if not cached)
+        startRepositoryParsing(tokenData.access_token);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to load repository";
+        console.error("Repository initialization failed:", err);
+        setError(errorMessage);
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     };
 
-    fetchRepositoryData();
-  }, [owner, repo, user]);
+    initializeRepository();
+  }, [owner, repo, user?.id]); // startRepositoryParsing is defined inside the effect, so it doesn't need to be a dependency
 
+  // Parse repository structure
+  const startRepositoryParsing = async (accessToken: string) => {
+    if (!owner || !repo || isParsing || parsedStructure) return;
+
+    setIsParsing(true);
+    setParsingError(null);
+
+    try {
+      const structureAnalyzer = new StructureAnalyzer(accessToken);
+      const structure = await structureAnalyzer.analyzeRepository(owner, repo);
+
+      setParsedStructure(structure);
+      setAnalysis((prev) => ({ ...prev, structure }));
+
+      // Save the parsed structure immediately for caching
+      if (user?.id) {
+        try {
+          const projectId = `${owner}/${repo}`;
+          await saveAnalysis(user.id, {
+            projectId,
+            structure: JSON.stringify(structure),
+          });
+          console.log("Repository structure cached successfully");
+        } catch (saveError) {
+          console.warn("Failed to cache repository structure:", saveError);
+        }
+      }
+
+      toast.success("Repository parsed successfully!");
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to parse repository";
+      console.error("Repository parsing failed:", err);
+      setParsingError(errorMessage);
+      toast.error(`Parsing failed: ${errorMessage}`);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  // Use cached parsed structure for analysis
   const runAnalysis = async () => {
-    if (!owner || !repo || !user) return;
+    if (!parsedStructure || !user) {
+      toast.error(
+        "Repository structure not available. Please wait for parsing to complete."
+      );
+      return;
+    }
 
     setAnalyzing(true);
     try {
-      // Get GitHub token
-      const tokenResponse = await fetch(
-        "http://localhost:4000/api/github-token",
-        {
-          credentials: "include",
-        }
+      const aiAnalyzer = new AIAnalyzer();
+      const codeAnalysis = await aiAnalyzer.analyzeCodeStructure(
+        parsedStructure
       );
 
-      const tokenData = await tokenResponse.json();
-      if (!tokenData.success) {
-        throw new Error("Failed to get GitHub token");
+      setAnalysis((prev) => ({ ...prev, codeAnalysis }));
+
+      // Save the analysis results for caching
+      if (user?.id) {
+        try {
+          const projectId = `${owner}/${repo}`;
+          await saveAnalysis(user.id, {
+            projectId,
+            codeAnalysis: JSON.stringify(codeAnalysis),
+          });
+        } catch (saveError) {
+          console.warn("Failed to cache code analysis:", saveError);
+        }
       }
 
-      // Run structure analysis
-      const structureAnalyzer = new StructureAnalyzer(tokenData.access_token);
-      const structure = await structureAnalyzer.analyzeRepository(owner, repo);
-
-      // Run AI analysis
-      const aiAnalyzer = new AIAnalyzer();
-      const codeAnalysis = await aiAnalyzer.analyzeCodeStructure(structure);
-
-      setAnalysis({
-        structure,
-        codeAnalysis,
-      });
-
-      console.log("Analysis completed successfully - ready to store");
+      toast.success("Analysis completed successfully!");
     } catch (error) {
       console.error("Analysis failed:", error);
-      setError("Analysis failed. Please try again.");
+      toast.error("Analysis failed. Please try again.");
     } finally {
       setAnalyzing(false);
     }
   };
 
+  // Use cached parsed structure for documentation generation
+  const generateDocumentation = async () => {
+    if (!parsedStructure || !repository) {
+      toast.error(
+        "Repository structure not available. Please wait for parsing to complete."
+      );
+      return;
+    }
+
+    setGeneratingDocs(true);
+    try {
+      const aiAnalyzer = new AIAnalyzer();
+      const language = repository.language?.toLowerCase() || "javascript";
+      const documentation = await aiAnalyzer.generateComprehensiveDocumentation(
+        parsedStructure,
+        language,
+        repository.name
+      );
+
+      setAnalysis((prev) => ({ ...prev, documentation }));
+
+      // Save the documentation for caching
+      if (user?.id) {
+        try {
+          const projectId = `${owner}/${repo}`;
+          await saveAnalysis(user.id, {
+            projectId,
+            documentation: JSON.stringify(documentation),
+          });
+        } catch (saveError) {
+          console.warn("Failed to cache documentation:", saveError);
+        }
+      }
+
+      toast.success("Documentation generated successfully!");
+    } catch (error) {
+      console.error("Documentation generation failed:", error);
+      toast.error("Documentation generation failed. Please try again.");
+    } finally {
+      setGeneratingDocs(false);
+    }
+  };
+
+  // Use cached parsed structure for test case generation
+  const generateTestCases = async () => {
+    if (!parsedStructure || !repository) {
+      toast.error(
+        "Repository structure not available. Please wait for parsing to complete."
+      );
+      return;
+    }
+
+    setGeneratingTests(true);
+    try {
+      const aiAnalyzer = new AIAnalyzer();
+      const language = repository.language?.toLowerCase() || "javascript";
+      const testResult = await aiAnalyzer.generateTestCasesFromStructure(
+        parsedStructure,
+        language,
+        repository.name
+      );
+
+      const testCases = {
+        testCases: testResult.testCases,
+        coverage: testResult.coverage,
+        framework: testResult.framework,
+      };
+
+      setAnalysis((prev) => ({ ...prev, testCases }));
+
+      // Save the test cases for caching
+      if (user?.id) {
+        try {
+          const projectId = `${owner}/${repo}`;
+          await saveAnalysis(user.id, {
+            projectId,
+            testCases: JSON.stringify(testCases),
+          });
+        } catch (saveError) {
+          console.warn("Failed to cache test cases:", saveError);
+        }
+      }
+
+      toast.success("Test cases generated successfully!");
+    } catch (error) {
+      console.error("Test generation failed:", error);
+      toast.error("Test generation failed. Please try again.");
+    } finally {
+      setGeneratingTests(false);
+    }
+  };
+
+  // Store analysis (unchanged)
   const storeAnalysis = async () => {
     if (!owner || !repo || !user) {
-      console.error("Missing data for storing analysis");
       toast.error("Missing data for storing analysis");
       return;
     }
 
-    // Check if there's ANY analysis data available
     const hasAnalysisData =
       analysis.structure ||
       analysis.codeAnalysis ||
@@ -349,8 +478,6 @@ export default function RepositoryDetailsPage() {
 
     try {
       const projectId = `${owner}/${repo}`;
-
-      // Store ALL available analysis data - no exceptions
       await saveAnalysis(user.id, {
         projectId,
         projectName: repository?.name || `${owner}/${repo}`,
@@ -368,112 +495,16 @@ export default function RepositoryDetailsPage() {
           : null,
       });
 
-      console.log("All analysis data stored successfully!");
-      toast.success("Analysis Stored Successfully!", {
-        description: `Stored ${[
-          analysis.structure && "Structure Analysis",
-          analysis.codeAnalysis && "Code Analysis",
-          analysis.documentation && "Documentation",
-          analysis.testCases && "Test Cases",
-        ]
-          .filter(Boolean)
-          .join(", ")}`,
-      });
+      toast.success("Analysis stored successfully!");
     } catch (error) {
       console.error("Failed to store analysis:", error);
       toast.error("Failed to store analysis. Please try again.");
     }
   };
 
-  const generateDocumentation = async () => {
-    if (!owner || !repo || !user) return;
-
-    setGeneratingDocs(true);
-    try {
-      const tokenResponse = await fetch(
-        "http://localhost:4000/api/github-token",
-        {
-          credentials: "include",
-        }
-      );
-      const tokenData = await tokenResponse.json();
-      const aiAnalyzer = new AIAnalyzer();
-      // Always do fresh analysis for comprehensive documentation
-      const structure = await new StructureAnalyzer(
-        tokenData.access_token
-      ).analyzeRepository(owner, repo);
-      const language = repository?.language?.toLowerCase() || "javascript";
-      const documentation = await aiAnalyzer.generateComprehensiveDocumentation(
-        structure,
-        language,
-        repository?.name || "Repository"
-      );
-      setAnalysis((prev) => ({
-        ...prev,
-        documentation,
-      }));
-
-      console.log("Documentation generated successfully - ready to store");
-    } catch (error) {
-      console.error("Documentation generation failed:", error);
-      setError("Documentation generation failed. Please try again.");
-    } finally {
-      setGeneratingDocs(false);
-    }
-  };
-
-  const generateTestCases = async () => {
-    if (!owner || !repo || !user) return;
-
-    setGeneratingTests(true);
-    try {
-      const tokenResponse = await fetch(
-        "http://localhost:4000/api/github-token",
-        {
-          credentials: "include",
-        }
-      );
-
-      const tokenData = await tokenResponse.json();
-      const aiAnalyzer = new AIAnalyzer();
-
-      // Always do fresh analysis for test generation
-      const structure = await new StructureAnalyzer(
-        tokenData.access_token
-      ).analyzeRepository(owner, repo);
-      const language = repository?.language?.toLowerCase() || "javascript";
-
-      // Use the new structure-based test generation method
-      const testResult = await aiAnalyzer.generateTestCasesFromStructure(
-        structure,
-        language,
-        repository?.name || "Repository"
-      );
-
-      const updatedTestCases = {
-        testCases: testResult.testCases,
-        coverage: testResult.coverage,
-        framework: testResult.framework,
-      };
-
-      setAnalysis((prev) => ({
-        ...prev,
-        testCases: updatedTestCases,
-      }));
-
-      console.log("Test cases generated successfully - ready to store");
-    } catch (error) {
-      console.error("Test generation failed:", error);
-      setError("Test generation failed. Please try again.");
-    } finally {
-      setGeneratingTests(false);
-    }
-  };
-
-  // Export documentation to Word format
+  // Export documentation (unchanged)
   const exportToWord = async (documentation: ComprehensiveDocumentation) => {
     try {
-      // Create a comprehensive document structure
       const docContent = `
 # ${repository?.name || "Repository"} Documentation
 
@@ -499,64 +530,83 @@ ${
       }*
       `;
 
-      // Create a Blob with the content
       const blob = new Blob([docContent], { type: "text/markdown" });
-
-      // Create download link
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = `${repository?.name || "repository"}-documentation.md`;
-
-      // Trigger download
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      // Clean up
       URL.revokeObjectURL(url);
-
-      console.log("Documentation exported successfully!");
     } catch (error) {
       console.error("Failed to export documentation:", error);
+      toast.error("Failed to export documentation");
     }
   };
 
-  // Toggle favorite status
+  // Toggle favorite (unchanged)
   const toggleFavorite = async () => {
-    if (owner && repo && user && repository) {
-      try {
-        if (isFavorite) {
-          await removeFavorite(user.id, repository.id.toString());
-          setIsFavorite(false);
-          toast.success("Removed from favorites");
-        } else {
-          await addFavorite(user.id, {
-            id: repository.id,
-            name: repository.name,
-            owner: {
-              login: repository.owner.login,
-              avatar_url: repository.owner.avatar_url,
-            },
-            description: repository.description,
-            language: repository.language,
-            stargazers_count: repository.stargazers_count,
-            forks_count: repository.forks_count,
-            html_url: repository.html_url,
-          });
-          setIsFavorite(true);
-          toast.success("Added to favorites");
-        }
-      } catch (error) {
-        console.error("Failed to toggle favorite:", error);
-        toast.error("Failed to update favorites");
+    if (!owner || !repo || !user || !repository) return;
+
+    try {
+      if (isFavorite) {
+        await removeFavorite(user.id, repository.id.toString());
+        setIsFavorite(false);
+        toast.success("Removed from favorites");
+      } else {
+        await addFavorite(user.id, {
+          id: repository.id,
+          name: repository.name,
+          owner: {
+            login: repository.owner.login,
+            avatar_url: repository.owner.avatar_url,
+          },
+          description: repository.description,
+          language: repository.language,
+          stargazers_count: repository.stargazers_count,
+          forks_count: repository.forks_count,
+          html_url: repository.html_url,
+        });
+        setIsFavorite(true);
+        toast.success("Added to favorites");
       }
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+      toast.error("Failed to update favorites");
     }
   };
 
-  if (loading) {
+  // Show parsing loader
+  if (isParsing) {
     return (
-      <div className="min-h-screen bg-background dark:bg-card flex items-center justify-center">
+      <ParsingLoader message="Analyzing repository structure and files..." />
+    );
+  }
+
+  // Show parsing error
+  if (parsingError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-6">
+            <h3 className="text-lg font-semibold mb-2 text-destructive">
+              Parsing Failed
+            </h3>
+            <p className="text-muted-foreground mb-4">{parsingError}</p>
+            <Button onClick={() => navigate("/dashboard")}>
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show initial loading
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading repository...</p>
@@ -565,15 +615,16 @@ ${
     );
   }
 
+  // Show error state
   if (error || !repository) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <h3 className="text-lg font-semibold mb-2">
               Error Loading Repository
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               {error || "Repository not found"}
             </p>
             <Button onClick={() => navigate("/dashboard")}>
@@ -585,11 +636,17 @@ ${
     );
   }
 
+  const hasAnalysisData = !!(
+    analysis.structure ||
+    analysis.codeAnalysis ||
+    analysis.documentation ||
+    analysis.testCases
+  );
+
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950">
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
         <div className="container mx-auto px-4 py-8">
-          {/* Repository Header Component */}
           <RepositoryHeader
             repository={repository}
             isFavorite={isFavorite}
@@ -604,7 +661,6 @@ ${
             onGenerateTestCases={generateTestCases}
           />
 
-          {/* Main Content Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -619,14 +675,7 @@ ${
               <OverviewTab
                 repository={repository}
                 onStoreAnalysis={storeAnalysis}
-                hasAnalysisData={
-                  !!(
-                    analysis.structure ||
-                    analysis.codeAnalysis ||
-                    analysis.documentation ||
-                    analysis.testCases
-                  )
-                }
+                hasAnalysisData={hasAnalysisData}
               />
             </TabsContent>
 
@@ -634,14 +683,7 @@ ${
               <ReadmeViewer
                 readme={readme}
                 onStoreAnalysis={storeAnalysis}
-                hasAnalysisData={
-                  !!(
-                    analysis.structure ||
-                    analysis.codeAnalysis ||
-                    analysis.documentation ||
-                    analysis.testCases
-                  )
-                }
+                hasAnalysisData={hasAnalysisData}
               />
             </TabsContent>
 
@@ -668,14 +710,7 @@ ${
                 onStoreAnalysis={storeAnalysis}
                 onExportToWord={exportToWord}
                 generatingDocs={generatingDocs}
-                hasAnalysisData={
-                  !!(
-                    analysis.structure ||
-                    analysis.codeAnalysis ||
-                    analysis.documentation ||
-                    analysis.testCases
-                  )
-                }
+                hasAnalysisData={hasAnalysisData}
               />
               {analysis.documentation && (
                 <div className="mt-6 text-center">
@@ -697,14 +732,7 @@ ${
                 onGenerateTestCases={generateTestCases}
                 onStoreAnalysis={storeAnalysis}
                 generatingTests={generatingTests}
-                hasAnalysisData={
-                  !!(
-                    analysis.structure ||
-                    analysis.codeAnalysis ||
-                    analysis.documentation ||
-                    analysis.testCases
-                  )
-                }
+                hasAnalysisData={hasAnalysisData}
               />
               {analysis.testCases && (
                 <div className="mt-6 text-center">
@@ -724,14 +752,7 @@ ${
               <CommitsTab
                 commits={commits}
                 onStoreAnalysis={storeAnalysis}
-                hasAnalysisData={
-                  !!(
-                    analysis.structure ||
-                    analysis.codeAnalysis ||
-                    analysis.documentation ||
-                    analysis.testCases
-                  )
-                }
+                hasAnalysisData={hasAnalysisData}
               />
             </TabsContent>
           </Tabs>

@@ -9,12 +9,15 @@ import type { ProjectStructure } from "@/types/codeparser.interface";
 // ✅ Wrap response parsing in a reusable function
 export function parseAiJsonResponse(aiText: string): any {
   try {
-    // Trim whitespace
+    console.log("🔍 Parsing AI response of length:", aiText.length);
+
     let sanitized = aiText.trim();
 
-    // Remove ```json or ``` wrapping if present
+    console.log("🔍 Raw AI response preview:", sanitized.substring(0, 200));
+
+    // Remove code fences if present
     if (sanitized.startsWith("```json")) {
-      sanitized = sanitized.replace(/^```json/, "").trim();
+      sanitized = sanitized.replace(/^```json\s*/, "").replace(/```\s*$/, "");
     }
     if (sanitized.startsWith("```")) {
       sanitized = sanitized.replace(/^```/, "").trim();
@@ -23,23 +26,102 @@ export function parseAiJsonResponse(aiText: string): any {
       sanitized = sanitized.slice(0, -3).trim();
     }
 
-    // Optional: fix any escaped characters (not always needed, but safe)
-    sanitized = sanitized
-      .replace(/\\"/g, '"') // Unescape quotes
-      .replace(/\\n/g, "") // Remove newline escapes
-      .replace(/\\r/g, "") // Remove carriage returns
-      .replace(/^"+|"+$/g, ""); // Trim surrounding quotes if present
+    // Handle case where response is wrapped in extra text or explanations
+    const jsonStart = sanitized.indexOf("{");
+    const jsonEnd = sanitized.lastIndexOf("}");
 
-    // Parse final cleaned string
-    return JSON.parse(sanitized);
+    if (jsonStart !== -1 && jsonEnd !== -1 && jsonStart < jsonEnd) {
+      sanitized = sanitized.substring(jsonStart, jsonEnd + 1);
+    }
+
+    // Fix common JSON formatting issues from AI responses
+    sanitized = sanitized
+      // Fix trailing commas
+      .replace(/,(\s*[}\]])/g, "$1")
+      // Fix multiple spaces
+      .replace(/\s{2,}/g, " ")
+      // Fix unescaped quotes in strings (basic fix)
+      .replace(/\\"/g, '"')
+      // Remove newline escapes that break JSON
+      .replace(/\\n/g, "")
+      .replace(/\\r/g, "")
+      // Remove any BOM or hidden characters
+      .replace(/^\uFEFF/, "")
+      .replace(/^"+|"+$/g, "")
+      .trim();
+
+    console.log("🔧 Cleaned AI response preview:", sanitized.substring(0, 200));
+
+    // Try parsing with error recovery
+    try {
+      return JSON.parse(sanitized);
+    } catch (firstError) {
+      console.warn("First JSON parse attempt failed, trying recovery...");
+
+      // Try to fix common issues
+      let recovered = sanitized
+        // Fix single quotes to double quotes (but be careful not to break escaped quotes)
+        .replace(/(?<!\\)'/g, '"')
+        // Fix missing quotes around object keys
+        .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+        // Fix trailing commas more aggressively
+        .replace(/,\s*([}\]])/g, "$1")
+        // Fix double commas
+        .replace(/,,+/g, ",");
+
+      console.log("🔧 Recovery attempt preview:", recovered.substring(0, 200));
+      return JSON.parse(recovered);
+    }
   } catch (err) {
     console.error("❌ Failed to parse AI JSON response:", err);
-    console.log("🔎 Raw AI response was:\n", aiText);
-    throw new Error("Could not parse AI response as valid JSON.");
+    console.log("🔎 Full raw AI response length:", aiText.length);
+    console.log(
+      "🔎 Raw AI response (first 500 chars):\n",
+      aiText.substring(0, 500)
+    );
+    console.log(
+      "🔎 Raw AI response (last 200 chars):\n",
+      aiText.substring(Math.max(0, aiText.length - 200))
+    );
+
+    // Try to extract just the main content if it's not properly formatted JSON
+    try {
+      // Look for key-value patterns and try to construct a basic object
+      const summary =
+        aiText.match(/"summary":\s*"([^"]+)"/)?.[1] ||
+        "Analysis failed - invalid JSON response";
+      console.log("🔄 Attempting basic object recovery with summary:", summary);
+
+      return {
+        summary,
+        architecture: {
+          pattern: "Unknown",
+          description: "Failed to parse AI response",
+          technologies: [],
+          layers: [],
+        },
+        folderStructure: {
+          tree: "Failed to generate",
+          directories: [],
+        },
+        components: [],
+        apis: [],
+        functions: [],
+        dataModels: [],
+        examples: [],
+        mermaidDiagram:
+          "flowchart TD\nA[Error] --> B[Failed to parse AI response]",
+        error: "AI response parsing failed, using minimal fallback",
+        rawResponse: aiText.substring(0, 1000), // Truncate for debugging
+      };
+    } catch (recoveryError) {
+      console.error("❌ Recovery attempt also failed:", recoveryError);
+      throw new Error("Could not parse AI response as valid JSON.");
+    }
   }
 }
 const DEFAULT_OPTIONS: AiResponseOptions = {
-  model: "mistralai/devstral-small:free",
+  model: "rekaai/reka-flash-3:free",
   systemPrompt:
     "You are a senior software development consultant, codebase auditor, and technical architect with expertise in modern software engineering practices and industry standards.\n\n" +
     "Your role is to thoroughly analyze code repositories and provide high-value, context-aware insights and recommendations across six key areas:\n\n" +
@@ -72,6 +154,8 @@ const DEFAULT_OPTIONS: AiResponseOptions = {
     "- Include system architecture, component design, data design, interface specifications, and operational scenarios[33][35][36]\n" +
     "- Document folder structure, API endpoints, key algorithms, and data flow patterns[35][37]\n" +
     "- Create accurate Mermaid diagrams using proper syntax: flowchart TD/LR for processes, sequenceDiagram for interactions, graph for dependencies, and architecture diagrams for system structure[39]\n" +
+    "- CRITICAL: Ensure Mermaid diagrams follow exact syntax rules: start with diagram type (flowchart TD, graph LR, sequenceDiagram), use valid node IDs (alphanumeric only), proper arrow syntax (A --> B), and no special characters in node names\n" +
+    "- CRITICAL: Ensure Mermaid diagrams follow exact syntax rules: start with diagram type (flowchart TD, graph LR, sequenceDiagram), use valid node IDs (alphanumeric only), proper arrow syntax (A --> B), and no special characters in node names\n" +
     "- Ensure documentation follows technical writing best practices: clarity, conciseness, consistent formatting, and audience-appropriate content[33][34][37]\n" +
     "- Include traceability matrices linking requirements to components and validation criteria[38]\n\n" +
     "6. **Refactoring Suggestions**\n" +
@@ -590,7 +674,8 @@ Generate a comprehensive test suite that demonstrates senior-level testing exper
       return this.fallbackComprehensiveDocumentationFromFiles(
         [],
         language,
-        repositoryName
+        repositoryName,
+        parsedData
       );
     }
 
@@ -619,7 +704,7 @@ It must be suitable for engineers, architects, QA analysts, and DevOps teams to 
 
 ### Project Details:
 - **Repository**: ${repositoryName}
-- **Files Analyzed**: ${selectedFiles.map((f) => f.path).join(", ")}
+- **Files Analyzed**: ${selectedFiles.map((f) => f.path)}
 
 \`\`\`${language}
 ${aggregatedContent}
@@ -783,7 +868,7 @@ Generate **only valid JSON** in the exact structure below. Every section should 
       "explanation": "How it helps the reader understand the system"
     }
   ],
-  "mermaidDiagram": "Mermaid syntax diagram to represent system flow, architecture, or sequence",
+  "mermaidDiagram": "CRITICAL: Create valid Mermaid diagram with exact syntax. MUST start with diagram type (flowchart TD, graph LR, sequenceDiagram). Use only alphanumeric node IDs (A, B, Module1, Service2). Proper arrows (A --> B, A --- B). NO SPECIAL CHARACTERS in node IDs. Example: 'flowchart TD\\nA[User] --> B[Frontend]\\nB --> C[API]\\nC --> D[Database]'. If unsure, use simple flowchart TD format.",
   "sdlc": {
     "developmentWorkflow": "Overall engineering workflow (e.g., Git flow, branching model, CI)",
     "setupInstructions": [
@@ -836,38 +921,83 @@ Treat this like a software design handover for a real engineering team. Be clear
         { maxTokens: 8192 }
       );
       console.log("✅ AI response received, length:", response.length);
-      console.log("🔄 Parsing AI response...");
 
-      const parsed = parseAiJsonResponse(response);
+      const parsedResult = parseAiJsonResponse(response);
+
+      // Validate and fix the Mermaid diagram if present
+      if (parsedResult.mermaidDiagram) {
+        parsedResult.mermaidDiagram = validateAndFixMermaidDiagram(
+          parsedResult.mermaidDiagram
+        );
+        console.log("🎯 Mermaid diagram validated and fixed");
+      }
 
       // --- ALWAYS use our own folder structure tree formatting ---
-      if (parsed.folderStructure) {
-        parsed.folderStructure.tree = createFolderStructureTree(
-          files,
+      // Use all files from the repository, not just the selected files for analysis
+      let allRepositoryFiles = files; // Start with all files that have content
+
+      // If parsedData has allFiles (complete file list), use that for better coverage
+      if (parsedData.allFiles && parsedData.allFiles.length > 0) {
+        allRepositoryFiles = parsedData.allFiles.map((f) => ({
+          path: f.path,
+          content: "", // We don't need content for folder structure
+        }));
+        console.log(
+          `📁 Using complete file list: ${parsedData.allFiles.length} files`
+        );
+        console.log(
+          `📁 Sample complete files:`,
+          parsedData.allFiles.slice(0, 10).map((f) => f.path)
+        );
+      } else {
+        console.log(`📁 Using parsed files: ${files.length} files`);
+        console.log(
+          `📁 Sample parsed files:`,
+          files.slice(0, 10).map((f) => f.path)
+        );
+      }
+
+      if (parsedResult.folderStructure) {
+        parsedResult.folderStructure.tree = createFolderStructureTree(
+          allRepositoryFiles,
           repositoryName
+        );
+        console.log(
+          `🌳 Folder structure tree generated with all ${allRepositoryFiles.length} files`
         );
       }
 
       console.log("✅ Documentation generated successfully!");
       console.log("📊 Generated data summary:", {
-        hasArchitecture: !!parsed.architecture,
-        hasTechnologies: !!parsed.architecture?.technologies?.length,
-        componentsCount: parsed.components?.length || 0,
-        apisCount: parsed.apis?.length || 0,
-        functionsCount: parsed.functions?.length || 0,
+        hasArchitecture: !!parsedResult.architecture,
+        hasTechnologies: !!parsedResult.architecture?.technologies?.length,
+        componentsCount: parsedResult.components?.length || 0,
+        apisCount: parsedResult.apis?.length || 0,
+        functionsCount: parsedResult.functions?.length || 0,
       });
 
-      return parsed;
+      return parsedResult;
     } catch (error) {
       console.error(
         "❌ AI comprehensive documentation generation failed:",
         error
       );
       console.log("🔄 Using fallback documentation...");
+
+      // Use all files for fallback documentation too
+      let allRepositoryFiles = files;
+      if (parsedData.allFiles && parsedData.allFiles.length > 0) {
+        allRepositoryFiles = parsedData.allFiles.map((f) => ({
+          path: f.path,
+          content: "",
+        }));
+      }
+
       return this.fallbackComprehensiveDocumentationFromFiles(
-        selectedFiles,
+        allRepositoryFiles,
         language,
-        repositoryName
+        repositoryName,
+        parsedData
       );
     }
   }
@@ -1126,6 +1256,7 @@ Generate this comprehensive SDD/README hybrid document that serves as both pract
   }
 
   private fallbackTestGeneration(language: string) {
+    console.warn("Using fallback test generation for language:", language);
     const frameworks = {
       javascript: "Jest",
       typescript: "Jest",
@@ -1204,6 +1335,11 @@ Generate this comprehensive SDD/README hybrid document that serves as both pract
   }
 
   private fallbackDocumentationGeneration(filePath: string, language: string) {
+    console.warn(
+      "Using fallback documentation generation for:",
+      filePath,
+      language
+    );
     return {
       summary: `${language} file located at ${filePath}. AI-powered analysis is currently unavailable, but this file appears to be part of the application's core functionality.`,
       functions: [
@@ -1226,12 +1362,27 @@ Generate this comprehensive SDD/README hybrid document that serves as both pract
   private fallbackComprehensiveDocumentationFromFiles(
     files: Array<{ path: string; content: string }>,
     language: string,
-    repositoryName: string
+    repositoryName: string,
+    parsedData?: ProjectStructure
   ) {
     const fileList =
       files.length > 0
         ? files.map((f) => f.path).join(", ")
         : "No files available";
+
+    // Use all files from parsedData if available, otherwise use the provided files
+    let allFiles = files;
+    if (parsedData?.allFiles && parsedData.allFiles.length > 0) {
+      allFiles = parsedData.allFiles.map((f) => ({
+        path: f.path,
+        content: "", // Content not needed for folder structure
+      }));
+      console.log(
+        `📁 Fallback using complete file list: ${parsedData.allFiles.length} files`
+      );
+    } else {
+      console.log(`📁 Fallback using parsed files: ${files.length} files`);
+    }
 
     return {
       summary: `${repositoryName} is a ${language} application. AI-powered analysis is currently unavailable, but the codebase includes the following files: ${fileList}`,
@@ -1268,13 +1419,13 @@ Generate this comprehensive SDD/README hybrid document that serves as both pract
         ],
       },
       folderStructure: {
-        tree: createFolderStructureTree(files, repositoryName),
+        tree: createFolderStructureTree(allFiles, repositoryName),
         directories: [
           {
             path: "src/",
             purpose: "Main source code directory",
             type: "source" as const,
-            fileCount: files.filter((f) => f.path.startsWith("src/")).length,
+            fileCount: allFiles.filter((f) => f.path.startsWith("src/")).length,
             description:
               "Contains the main application source code including components, services, and utilities",
           },
@@ -1440,10 +1591,11 @@ Generate this comprehensive SDD/README hybrid document that serves as both pract
           validation: ["Required field validation"],
         },
       ],
-      mermaidDiagram:
-        "graph TD\nA[User] --> B[" +
-        repositoryName +
-        " Application]\nB --> C[Business Logic]\nC --> D[Data Layer]",
+      mermaidDiagram: validateAndFixMermaidDiagram(
+        "flowchart TD\nA[User] --> B[" +
+          repositoryName +
+          " Application]\nB --> C[Business Logic]\nC --> D[Data Layer]"
+      ),
       examples: [
         {
           title: "Basic Usage",
@@ -1563,84 +1715,204 @@ Generate this comprehensive SDD/README hybrid document that serves as both pract
 
 // Utility function to create a properly formatted folder structure tree
 function createFolderStructureTree(
-  files: Array<{ path: string; content: string }>,
+  files: Array<{ path: string; content?: string }>,
   repositoryName: string
 ): string {
   if (!files || files.length === 0) {
     return `${repositoryName}/\n└── (empty)`;
   }
 
-  // Group files by directory
-  const structure: Record<string, string[]> = {};
-  const directories = new Set<string>();
+  console.log(`🌳 Creating folder structure tree for ${files.length} files`);
+  console.log(
+    "📂 Sample file paths:",
+    files.slice(0, 15).map((f) => f.path)
+  );
 
-  files.forEach((file) => {
-    const parts = file.path.split("/");
-    let currentPath = "";
-
-    // Add all directory levels
-    for (let i = 0; i < parts.length - 1; i++) {
-      currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
-      directories.add(currentPath);
-    }
-
-    // Add file to its directory
-    const dir = parts.slice(0, -1).join("/") || ".";
-    const fileName = parts[parts.length - 1];
-
-    if (!structure[dir]) {
-      structure[dir] = [];
-    }
-    structure[dir].push(fileName);
-  });
-
-  // Sort directories and files
-  const sortedDirs = Array.from(directories).sort();
-  Object.keys(structure).forEach((dir) => {
-    structure[dir].sort();
-  });
-
-  // Build tree string
-  let tree = `${repositoryName}/\n`;
-  const allPaths = [
-    ...sortedDirs,
-    ...Object.keys(structure).filter((dir) => dir !== "."),
-  ];
-  const uniquePaths = [...new Set(allPaths)].sort();
-
-  // Add root files first
-  if (structure["."]) {
-    structure["."].forEach((file, index) => {
-      const isLast =
-        index === structure["."].length - 1 && uniquePaths.length === 0;
-      tree += `${isLast ? "└── " : "├── "}${file}\n`;
-    });
+  if (files.length > 15) {
+    console.log(
+      "📂 More file paths:",
+      files.slice(15, 30).map((f) => f.path)
+    );
   }
 
-  // Add directories and their contents
-  uniquePaths.forEach((path, pathIndex) => {
-    if (path === ".") return;
+  // Build a tree structure from file paths
+  interface TreeNode {
+    name: string;
+    isFile: boolean;
+    children: Map<string, TreeNode>;
+    path: string;
+  }
 
-    const isLastPath = pathIndex === uniquePaths.length - 1;
-    const depth = path.split("/").length;
-    const indent = "│   ".repeat(depth - 1);
-    const connector = isLastPath ? "└── " : "├── ";
-    const dirName = path.split("/").pop();
+  const root: TreeNode = {
+    name: repositoryName,
+    isFile: false,
+    children: new Map(),
+    path: "",
+  };
 
-    tree += `${indent}${connector}${dirName}/\n`;
+  // Add all files to the tree
+  files.forEach((file) => {
+    if (!file.path) return; // Skip files without path
 
-    // Add files in this directory
-    if (structure[path]) {
-      structure[path].forEach((file, fileIndex) => {
-        const isLastFile = fileIndex === structure[path].length - 1;
-        const fileIndent = isLastPath
-          ? "    ".repeat(depth)
-          : "│   ".repeat(depth);
-        const fileConnector = isLastFile ? "└── " : "├── ";
-        tree += `${fileIndent}${fileConnector}${file}\n`;
-      });
+    const parts = file.path.split("/").filter((part) => part.length > 0);
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLastPart = i === parts.length - 1;
+      const currentPath = parts.slice(0, i + 1).join("/");
+
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          name: part,
+          isFile: isLastPart,
+          children: new Map(),
+          path: currentPath,
+        });
+      }
+
+      current = current.children.get(part)!;
     }
   });
 
-  return tree.trim();
+  // Convert tree to ASCII representation
+  function buildTreeString(
+    node: TreeNode,
+    prefix: string = "",
+    isLast: boolean = true
+  ): string {
+    let result = "";
+
+    if (node.name !== repositoryName) {
+      const connector = isLast ? "└── " : "├── ";
+      const suffix = node.isFile ? "" : "/";
+      result += prefix + connector + node.name + suffix + "\n";
+    } else {
+      result += repositoryName + "/\n";
+    }
+
+    const children = Array.from(node.children.values()).sort((a, b) => {
+      // Directories first, then files, alphabetically within each group
+      if (!a.isFile && b.isFile) return -1;
+      if (a.isFile && !b.isFile) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    children.forEach((child, index) => {
+      const isChildLast = index === children.length - 1;
+      const childPrefix =
+        node.name === repositoryName ? "" : prefix + (isLast ? "    " : "│   ");
+
+      result += buildTreeString(child, childPrefix, isChildLast);
+    });
+
+    return result;
+  }
+
+  const result = buildTreeString(root).trim();
+  console.log(`🌳 Generated tree with ${result.split("\n").length} lines`);
+  return result;
+}
+
+// Mermaid diagram validation and fixing function
+export function validateAndFixMermaidDiagram(diagram: string): string {
+  if (!diagram || typeof diagram !== "string") {
+    return "flowchart TD\nA[Start] --> B[End]";
+  }
+
+  let cleaned = diagram.trim();
+
+  // Remove any markdown code blocks
+  if (cleaned.startsWith("```mermaid")) {
+    cleaned = cleaned.replace(/^```mermaid\s*/, "").replace(/```\s*$/, "");
+  } else if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
+  }
+
+  cleaned = cleaned.trim();
+
+  // Check if it starts with a valid diagram type
+  const validTypes = [
+    "flowchart TD",
+    "flowchart LR",
+    "flowchart TB",
+    "flowchart RL",
+    "graph TD",
+    "graph LR",
+    "graph TB",
+    "graph RL",
+    "sequenceDiagram",
+    "classDiagram",
+    "erDiagram",
+    "gitgraph",
+    "pie",
+    "journey",
+    "gantt",
+    "mindmap",
+    "timeline",
+  ];
+
+  const hasValidStart = validTypes.some((type) => cleaned.startsWith(type));
+
+  if (!hasValidStart) {
+    // Try to auto-fix by adding flowchart TD
+    cleaned = "flowchart TD\n" + cleaned;
+  }
+
+  // Fix common syntax issues
+  cleaned = cleaned
+    // Fix node IDs with special characters
+    .replace(/\[([^\]]*)\s+([^\]]*)\]/g, "[$1_$2]")
+    // Fix arrows with spaces
+    .replace(/\s*-->\s*/g, " --> ")
+    .replace(/\s*---\s*/g, " --- ")
+    // Remove extra whitespace
+    .replace(/\n\s*\n/g, "\n")
+    .trim();
+
+  // Validate that each line follows proper syntax
+  const lines = cleaned.split("\n");
+  const fixedLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Skip diagram type declarations
+    if (i === 0 && validTypes.some((type) => line.startsWith(type))) {
+      fixedLines.push(line);
+      continue;
+    }
+
+    // Fix node definitions and connections
+    if (line.includes("-->") || line.includes("---")) {
+      // Ensure node IDs are alphanumeric
+      const fixedLine = line.replace(
+        /([A-Za-z0-9_]+)(\[[^\]]+\])?/g,
+        (_, id, label) => {
+          const cleanId = id.replace(/[^A-Za-z0-9_]/g, "_");
+          return cleanId + (label || "");
+        }
+      );
+      fixedLines.push(fixedLine);
+    } else if (line.match(/^[A-Za-z0-9_]+(\[[^\]]+\])?$/)) {
+      // Simple node definition
+      fixedLines.push(line);
+    } else {
+      // Try to fix the line or skip if it's malformed
+      const fixedLine = line.replace(/[^A-Za-z0-9_[\]\->\s]/g, "_");
+      if (fixedLine.trim()) {
+        fixedLines.push(fixedLine);
+      }
+    }
+  }
+
+  const result = fixedLines.join("\n");
+
+  // Final validation - if the result is too broken, return a safe fallback
+  if (result.split("\n").length < 2) {
+    return "flowchart TD\nA[Application] --> B[Component]\nB --> C[Output]";
+  }
+
+  return result;
 }
