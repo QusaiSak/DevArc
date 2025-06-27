@@ -23,7 +23,7 @@ import type { Project } from "@/types/project.interface";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import MermaidDiagram from "@/components/MermaidDiagram";
+import MermaidDiagram from "@/components/repository/helper/MermaidDiagram";
 
 export default function ProjectViewPage() {
   const { id } = useParams<{ id: string }>();

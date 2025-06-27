@@ -15,7 +15,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 
 export const HeroSection = () => {
   const { login, isAuthenticated } = useAuth();
@@ -128,19 +128,28 @@ export const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           >
-            <motion.span 
+            <motion.span
               className="block bg-gradient-to-r from-slate-900 via-blue-600 to-purple-600 dark:from-white dark:via-blue-200 dark:to-purple-200 bg-clip-text text-transparent pb-2"
               initial={{ backgroundPosition: "0% 50%" }}
               animate={{ backgroundPosition: "100% 50%" }}
-              transition={{ duration: 3, repeat: Infinity, repeatType: "reverse" }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                repeatType: "reverse",
+              }}
             >
               Transform Your
             </motion.span>
-            <motion.span 
+            <motion.span
               className="block bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent"
               initial={{ backgroundPosition: "100% 50%" }}
               animate={{ backgroundPosition: "0% 50%" }}
-              transition={{ duration: 3, repeat: Infinity, repeatType: "reverse", delay: 1.5 }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                repeatType: "reverse",
+                delay: 1.5,
+              }}
             >
               Development Workflow
             </motion.span>
@@ -177,15 +186,15 @@ export const HeroSection = () => {
                 className="flex items-center px-3 sm:px-4 py-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-full border border-slate-200/50 dark:border-slate-700/50 shadow-lg"
                 initial={{ opacity: 0, x: -20, scale: 0.8 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
-                transition={{ 
-                  duration: 0.5, 
+                transition={{
+                  duration: 0.5,
                   delay: feature.delay,
-                  ease: "easeOut"
+                  ease: "easeOut",
                 }}
-                whileHover={{ 
-                  scale: 1.05, 
+                whileHover={{
+                  scale: 1.05,
                   y: -2,
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
                 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -276,10 +285,7 @@ export const HeroSection = () => {
                 </Button>
               </motion.div>
             )}
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 size="lg"
                 variant="outline"
@@ -314,15 +320,15 @@ export const HeroSection = () => {
                 transition={{ duration: 0.6, delay: stat.delay }}
                 whileHover={{ scale: 1.05, y: -5 }}
               >
-                <motion.div 
+                <motion.div
                   className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-1 sm:mb-2"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  transition={{ 
-                    duration: 0.8, 
+                  transition={{
+                    duration: 0.8,
                     delay: stat.delay + 0.2,
                     type: "spring",
-                    stiffness: 200
+                    stiffness: 200,
                   }}
                 >
                   {stat.value}
@@ -430,7 +436,7 @@ export const HeroSection = () => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 1.6 }}
         >
-          <motion.div 
+          <motion.div
             className="text-sm text-slate-500 dark:text-slate-400 mb-4"
             animate={{ opacity: [0.7, 1, 0.7] }}
             transition={{ duration: 2, repeat: Infinity }}

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
-import { validateAndFixMermaidDiagram } from "@/lib/aiService";
+import { validateAndFixMermaidDiagram } from "@/helper/utils";
 
 interface MermaidDiagramProps {
   chart: string;

@@ -1,7 +1,7 @@
 // API service for analyses
 const API_BASE = "http://localhost:4000/api";
 
-export async function saveAnalysis(userId: number, data: any) {
+export async function saveAnalysis(data: unknown) {
   const res = await fetch(`${API_BASE}/analyses`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -12,7 +12,7 @@ export async function saveAnalysis(userId: number, data: any) {
   return res.json();
 }
 
-export async function getAnalysis(userId: number, projectId: string) {
+export async function getAnalysis(projectId: string) {
   const encodedProjectId = encodeURIComponent(projectId);
   const res = await fetch(`${API_BASE}/analyses/${encodedProjectId}`, {
     credentials: "include",
@@ -21,7 +21,7 @@ export async function getAnalysis(userId: number, projectId: string) {
   return res.json();
 }
 
-export async function getAllUserAnalyses(userId: number) {
+export async function getAllUserAnalyses() {
   const res = await fetch(`${API_BASE}/analyses`, {
     credentials: "include",
   });

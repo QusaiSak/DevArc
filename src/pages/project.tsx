@@ -12,10 +12,10 @@ import {
   Layers,
   Zap,
 } from "lucide-react";
-import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { RepoImportModal } from "./repoModal";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { RepoImportModal } from "../components/repository/helper/repoModal";
 import { getAllUserProjects } from "@/lib/projectService";
 import type { Repository } from "@/types/github.interface";
 import type { Project } from "@/types/project.interface";
@@ -70,7 +70,7 @@ export const Dashboard = () => {
           transition={{ duration: 0.6 }}
         >
           <div className="flex items-center justify-center mb-4">
-            <motion.div 
+            <motion.div
               className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-blue-600 flex items-center justify-center shadow-2xl transform hover:scale-105 transition-all duration-300 group relative overflow-hidden"
               whileHover={{ rotate: 5 }}
               transition={{ duration: 0.3 }}
@@ -116,8 +116,10 @@ export const Dashboard = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             whileHover={{ y: -8 }}
           >
-            <div className="group relative overflow-hidden bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer"
-                 onClick={handleCreateProject}>
+            <div
+              className="group relative overflow-hidden bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer"
+              onClick={handleCreateProject}
+            >
               <motion.div
                 className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/30 dark:from-blue-950/30 dark:via-transparent dark:to-purple-950/20 opacity-0 group-hover:opacity-100"
                 transition={{ duration: 0.5 }}
@@ -141,17 +143,15 @@ export const Dashboard = () => {
                     Create New Project
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 max-w-sm leading-relaxed group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors duration-300">
-                    Start from scratch with AI-powered SDLC recommendations, smart
-                    configuration, and guided setup
+                    Start from scratch with AI-powered SDLC recommendations,
+                    smart configuration, and guided setup
                   </p>
                 </div>
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <Button
-                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden group/btn"
-                  >
+                  <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden group/btn">
                     <span className="relative z-10 flex items-center gap-2">
                       Get Started
                       <motion.div
@@ -178,8 +178,10 @@ export const Dashboard = () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             whileHover={{ y: -8 }}
           >
-            <div className="group relative overflow-hidden bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer"
-                 onClick={() => setIsImportModalOpen(true)}>
+            <div
+              className="group relative overflow-hidden bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer"
+              onClick={() => setIsImportModalOpen(true)}
+            >
               <motion.div
                 className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 via-transparent to-green-50/30 dark:from-emerald-950/30 dark:via-transparent dark:to-green-950/20 opacity-0 group-hover:opacity-100"
                 transition={{ duration: 0.5 }}
@@ -256,10 +258,7 @@ export const Dashboard = () => {
                 Your latest work and ongoing development
               </motion.p>
             </div>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 variant="outline"
                 onClick={() => navigate("/projects")}
@@ -389,7 +388,9 @@ export const Dashboard = () => {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => navigate(`/projects/${project.id}`)}
+                              onClick={() =>
+                                navigate(`/projects/${project.id}`)
+                              }
                               className="h-9 w-9 p-0 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-200 rounded-xl group/btn"
                             >
                               <motion.div

@@ -1,4 +1,4 @@
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { getFavorites } from "@/lib/favoritesService";
 import { getAllUserAnalyses } from "@/lib/analysesService";
-import { FavoritesList } from "@/components/FavoritesList";
+import { FavoritesList } from "@/components/favorite/FavoritesList";
 
 interface Analysis {
   testCases?: { testCases?: any[] };

@@ -1,6 +1,6 @@
 import React from "react";
-import MermaidDiagram from "../MermaidDiagram";
-import { Badge } from "../ui/badge";
+import MermaidDiagram from "./MermaidDiagram";
+import { Badge } from "../../ui/badge";
 
 interface CodeRendererProps extends React.HTMLAttributes<HTMLElement> {
   className?: string;

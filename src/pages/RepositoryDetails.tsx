@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 import { GitHubService } from "@/lib/github";
 import { StructureAnalyzer } from "@/lib/structure";
 import { AIAnalyzer } from "@/lib/aiService";
@@ -18,7 +18,7 @@ import type {
   ProjectStructure,
 } from "@/types/codeparser.interface";
 import { toast } from "sonner";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import ErrorBoundary from "@/authAndError/ErrorBoundary";
 import {
   RepositoryHeader,
   ReadmeViewer,
@@ -29,64 +29,11 @@ import {
   OverviewTab,
 } from "@/components/repository";
 import { ParsingLoader } from "@/components/ui/ParsingLoader";
-
-interface RepositoryData {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string;
-  html_url: string;
-  clone_url: string;
-  language: string;
-  stargazers_count: number;
-  forks_count: number;
-  watchers_count: number;
-  open_issues_count: number;
-  size: number;
-  created_at: string;
-  updated_at: string;
-  pushed_at: string;
-  private: boolean;
-  owner: {
-    login: string;
-    avatar_url: string;
-  };
-}
-
-interface CommitData {
-  sha: string;
-  commit: {
-    message: string;
-    author: {
-      name: string;
-      date: string;
-    };
-  };
-  html_url: string;
-}
-
-interface AnalysisResults {
-  structure?: ProjectStructure;
-  codeAnalysis?: {
-    qualityScore: number;
-    strengths: string[];
-    weaknesses: string[];
-    recommendations: string[];
-    maintainabilityIndex: number;
-  };
-  documentation?: ComprehensiveDocumentation;
-  testCases?: {
-    testCases: {
-      name: string;
-      type: string;
-      priority: string;
-      description: string;
-      code: string;
-    }[];
-    coverage: number;
-    framework: string;
-  };
-}
+import type {
+  AnalysisResults,
+  CommitData,
+  RepositoryData,
+} from "@/types/repo.interface";
 
 export default function RepositoryDetailsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -166,7 +113,7 @@ export default function RepositoryDetailsPage() {
             ? commitsData
             : (commitsData as any)?.data || [];
           setCommits(
-            commitsArray.map((commit: any) => ({
+            commitsArray.map((commit: CommitData) => ({
               sha: commit.sha || "",
               commit: {
                 message: commit.commit?.message || "",
@@ -198,10 +145,7 @@ export default function RepositoryDetailsPage() {
           // Load stored analysis if available
           try {
             const projectId = `${owner}/${repo}`;
-            const { analysis: storedAnalysis } = await getAnalysis(
-              user.id,
-              projectId
-            );
+            const { analysis: storedAnalysis } = await getAnalysis(projectId);
 
             // Parse stored analysis data
             if (storedAnalysis) {
@@ -304,7 +248,7 @@ export default function RepositoryDetailsPage() {
       if (user?.id) {
         try {
           const projectId = `${owner}/${repo}`;
-          await saveAnalysis(user.id, {
+          await saveAnalysis({
             projectId,
             structure: JSON.stringify(structure),
           });
@@ -348,7 +292,7 @@ export default function RepositoryDetailsPage() {
       if (user?.id) {
         try {
           const projectId = `${owner}/${repo}`;
-          await saveAnalysis(user.id, {
+          await saveAnalysis({
             projectId,
             codeAnalysis: JSON.stringify(codeAnalysis),
           });
@@ -385,25 +329,30 @@ export default function RepositoryDetailsPage() {
         repository.name
       );
 
-      setAnalysis((prev) => ({ ...prev, documentation }));
+      console.log("✅ Documentation generated:", documentation); // Add this line
+
+      setAnalysis((prev) => {
+        const updatedAnalysis = { ...prev, documentation };
+        console.log("✅ Analysis state updated:", updatedAnalysis); // Add this line
+        return updatedAnalysis;
+      });
 
       // Save the documentation for caching
       if (user?.id) {
         try {
           const projectId = `${owner}/${repo}`;
-          await saveAnalysis(user.id, {
+          await saveAnalysis({
             projectId,
             documentation: JSON.stringify(documentation),
           });
         } catch (saveError) {
-          console.warn("Failed to cache documentation:", saveError);
+          console.error("❌ Error saving analysis:", saveError);
+          toast.error("Error saving analysis.");
         }
       }
-
-      toast.success("Documentation generated successfully!");
     } catch (error) {
-      console.error("Documentation generation failed:", error);
-      toast.error("Documentation generation failed. Please try again.");
+      console.error("❌ Documentation generation failed:", error);
+      toast.error("Documentation generation failed.");
     } finally {
       setGeneratingDocs(false);
     }
@@ -422,7 +371,7 @@ export default function RepositoryDetailsPage() {
     try {
       const aiAnalyzer = new AIAnalyzer();
       const language = repository.language?.toLowerCase() || "javascript";
-      const testResult = await aiAnalyzer.generateTestCasesFromStructure(
+      const testResult: any = await aiAnalyzer.generateTestCasesFromStructure(
         parsedStructure,
         language,
         repository.name
@@ -433,14 +382,13 @@ export default function RepositoryDetailsPage() {
         coverage: testResult.coverage,
         framework: testResult.framework,
       };
-
       setAnalysis((prev) => ({ ...prev, testCases }));
 
       // Save the test cases for caching
       if (user?.id) {
         try {
           const projectId = `${owner}/${repo}`;
-          await saveAnalysis(user.id, {
+          await saveAnalysis({
             projectId,
             testCases: JSON.stringify(testCases),
           });
@@ -478,7 +426,7 @@ export default function RepositoryDetailsPage() {
 
     try {
       const projectId = `${owner}/${repo}`;
-      await saveAnalysis(user.id, {
+      await saveAnalysis({
         projectId,
         projectName: repository?.name || `${owner}/${repo}`,
         structure: analysis.structure

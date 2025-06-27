@@ -16,31 +16,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { RepositoryHeaderProps } from "@/types/repo.interface";
 
-interface RepositoryData {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string;
-  html_url: string;
-  clone_url: string;
-  language: string;
-  stargazers_count: number;
-  forks_count: number;
-  watchers_count: number;
-  open_issues_count: number;
-  size: number;
-  created_at: string;
-  updated_at: string;
-  pushed_at: string;
-  private: boolean;
-  owner: {
-    login: string;
-    avatar_url: string;
-  };
-}
 
-interface AnalysisResults {
+export interface AnalysisResults {
   structure?: {
     totalFiles: number;
     totalLines: number;
@@ -70,19 +49,7 @@ interface AnalysisResults {
   };
 }
 
-interface RepositoryHeaderProps {
-  repository: RepositoryData;
-  isFavorite: boolean;
-  analyzing: boolean;
-  generatingDocs: boolean;
-  generatingTests: boolean;
-  analysis: AnalysisResults;
-  onToggleFavorite: () => void;
-  onRunAnalysis: () => void;
-  onStoreAnalysis: () => void;
-  onGenerateDocumentation: () => void;
-  onGenerateTestCases: () => void;
-}
+
 
 export const RepositoryHeader: React.FC<RepositoryHeaderProps> = ({
   repository,

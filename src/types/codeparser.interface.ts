@@ -269,5 +269,5 @@ export interface StoredProject {
   lastUpdated: string;
   addedAt: string;
   documentation?: ComprehensiveDocumentation;
-  analysis?: any;
+  analysis?: unknown;
 }

@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 import { AIAnalyzer } from "@/lib/aiService";
 import { createProjectWithGitHubDirect } from "@/lib/projectService";
 import type { ProjectData, SDDProjectInput } from "@/types/ai.interface";

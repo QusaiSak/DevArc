@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 import {
   addFavorite,
   removeFavorite,

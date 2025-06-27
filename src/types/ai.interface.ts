@@ -35,4 +35,6 @@ export interface SDDProjectInput {
   requirements: string;
   additionalContext: string;
   sdlcModel: string;
+  objectives?: string; // <-- Add this (e.g., "Build a scalable web application")
+  benefits?: string; // <-- Add this (e.g., "Improve user engagement, Increase revenue")
 }

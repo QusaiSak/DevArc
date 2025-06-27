@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Modal } from "./hooks/modal-hook";
-import { Button } from "./ui/button";
+import { Modal } from "../../hooks/modal-hook";
+import { Button } from "../../ui/button";
 import {
-  GitBranch,
   Star,
   GitFork,
-  Calendar,
   Search,
   Loader2,
   ExternalLink,
@@ -17,10 +15,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Code,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 import { GitHubService } from "@/lib/github";
 
 interface Repository {
@@ -50,7 +47,6 @@ interface RepoImportModalProps {
 export const RepoImportModal: React.FC<RepoImportModalProps> = ({
   isOpen,
   onClose,
-  onImport,
 }) => {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [filteredRepos, setFilteredRepos] = useState<Repository[]>([]);
@@ -142,7 +138,7 @@ export const RepoImportModal: React.FC<RepoImportModalProps> = ({
       }
 
       // Map the GitHubRepo interface to your Repository interface
-      const mappedRepos: Repository[] = repos.map((repo: any) => ({
+      const mappedRepos: Repository[] = repos.map((repo: Repository) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,

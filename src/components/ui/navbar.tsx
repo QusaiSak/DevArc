@@ -1,7 +1,7 @@
 import type { NavbarItem } from "@/types/navbar.interface";
 import { Link } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
-import { Button } from "./ui/button";
+import { Button } from "./button";
 import {
   Github,
   LogOut,
@@ -13,7 +13,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 import { motion, AnimatePresence } from "motion/react";
 
 export const Navbar = () => {

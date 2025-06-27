@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { getFavorites, removeFavorite } from "@/lib/favoritesService";
 import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/authAndError/AuthContext";
 
 interface Favorite {
   id: string;
