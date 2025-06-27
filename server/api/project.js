@@ -112,15 +112,6 @@ router.post("/", authenticate, async (req, res) => {
     const {
       name,
       description,
-      type,
-      teamSize,
-      timeline,
-      complexity,
-      techStack,
-      keyFeatures,
-      riskFactors,
-      requirements,
-      additionalContext,
       sdlc,
       questions,
       repoUrl,
@@ -128,13 +119,6 @@ router.post("/", authenticate, async (req, res) => {
       visibility = "private",
     } = req.body;
 
-    console.log("🔍 Extracted data:");
-    console.log("- name:", name);
-    console.log("- description:", description);
-    console.log("- sdlc type:", typeof sdlc);
-    console.log("- sdlc:", JSON.stringify(sdlc, null, 2));
-    console.log("- questions type:", typeof questions);
-    console.log("- questions:", JSON.stringify(questions, null, 2));
 
     // Validate required fields
     if (!name || !description) {

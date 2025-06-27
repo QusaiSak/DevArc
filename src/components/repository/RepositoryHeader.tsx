@@ -18,39 +18,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { RepositoryHeaderProps } from "@/types/repo.interface";
 
-
-export interface AnalysisResults {
-  structure?: {
-    totalFiles: number;
-    totalLines: number;
-    testCoverage: number;
-    complexity: {
-      average: number;
-    };
-  };
-  codeAnalysis?: {
-    qualityScore: number;
-    strengths: string[];
-    weaknesses: string[];
-    recommendations: string[];
-    maintainabilityIndex: number;
-  };
-  documentation?: unknown;
-  testCases?: {
-    testCases: {
-      name: string;
-      type: string;
-      priority: string;
-      description: string;
-      code: string;
-    }[];
-    coverage: number;
-    framework: string;
-  };
-}
-
-
-
 export const RepositoryHeader: React.FC<RepositoryHeaderProps> = ({
   repository,
   isFavorite,

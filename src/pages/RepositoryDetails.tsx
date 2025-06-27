@@ -48,8 +48,9 @@ export default function RepositoryDetailsPage() {
 
   // Analysis states
   const [analysis, setAnalysis] = useState<AnalysisResults>({});
-  const [parsedStructure, setParsedStructure] =
-    useState<ProjectStructure | null>(null);
+  const [parsedStructure, setParsedStructure] = useState<
+    ProjectStructure | any | null
+  >(null);
 
   // Loading states
   const [initialLoading, setInitialLoading] = useState(true);
@@ -286,7 +287,7 @@ export default function RepositoryDetailsPage() {
         parsedStructure
       );
 
-      setAnalysis((prev) => ({ ...prev, codeAnalysis }));
+      setAnalysis((prev): any => ({ ...prev, codeAnalysis }));
 
       // Save the analysis results for caching
       if (user?.id) {
@@ -331,7 +332,7 @@ export default function RepositoryDetailsPage() {
 
       console.log("✅ Documentation generated:", documentation); // Add this line
 
-      setAnalysis((prev) => {
+      setAnalysis((prev): any => {
         const updatedAnalysis = { ...prev, documentation };
         console.log("✅ Analysis state updated:", updatedAnalysis); // Add this line
         return updatedAnalysis;

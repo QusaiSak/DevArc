@@ -12,43 +12,9 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
+import type { AnalysisTabProps } from "@/types/repo.interface";
 
-interface AnalysisResults {
-  structure?: {
-    totalFiles: number;
-    totalLines: number;
-    testCoverage: number;
-    complexity: {
-      average: number;
-    };
-  };
-  codeAnalysis?: {
-    qualityScore: number;
-    strengths: string[];
-    weaknesses: string[];
-    recommendations: string[];
-    maintainabilityIndex: number;
-  };
-  documentation?: unknown;
-  testCases?: {
-    testCases: {
-      name: string;
-      type: string;
-      priority: string;
-      description: string;
-      code: string;
-    }[];
-    coverage: number;
-    framework: string;
-  };
-}
 
-interface AnalysisTabProps {
-  analysis: AnalysisResults;
-  analyzing: boolean;
-  onRunAnalysis: () => void;
-  onStoreAnalysis: () => void;
-}
 
 export const AnalysisTab: React.FC<AnalysisTabProps> = ({
   analysis,

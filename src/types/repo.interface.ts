@@ -1,7 +1,4 @@
-import type {
-  ComprehensiveDocumentation,
-  ProjectStructure,
-} from "./codeparser.interface";
+import type { ComprehensiveDocumentation } from "./codeparser.interface";
 
 export interface RepositoryData {
   id: number;
@@ -39,7 +36,14 @@ export interface CommitData {
 }
 
 export interface AnalysisResults {
-  structure?: ProjectStructure;
+  structure?: {
+    totalFiles: number;
+    totalLines: number;
+    testCoverage: number;
+    complexity: {
+      average: number;
+    };
+  };
   codeAnalysis?: {
     qualityScore: number;
     strengths: string[];
@@ -69,14 +73,8 @@ export interface TestCase {
   code: string;
 }
 
-export interface TestCasesData {
-  testCases: TestCase[];
-  coverage: number;
-  framework: string;
-}
-
 export interface TestCasesTabProps {
-  testCases?: TestCasesData;
+  testCases?: unknown;
   generatingTests: boolean;
   onGenerateTestCases: () => void;
   onStoreAnalysis: () => void;
@@ -95,4 +93,11 @@ export interface RepositoryHeaderProps {
   onStoreAnalysis: () => void;
   onGenerateDocumentation: () => void;
   onGenerateTestCases: () => void;
+}
+
+export interface AnalysisTabProps {
+  analysis: AnalysisResults;
+  analyzing: boolean;
+  onRunAnalysis: () => void;
+  onStoreAnalysis: () => void;
 }
