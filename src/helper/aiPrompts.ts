@@ -383,6 +383,210 @@ ${aggregatedContent}
 
 Produce a comprehensive SDD-level documentation set that includes:
 
+1. **Folder Structure** (REQUIRED)
+   - Generate a proper directory tree visualization using the file paths provided
+   - Include detailed directory descriptions with types (e.g., "src", "components", "api", "config")
+   - Categorize directories by purpose (source code, configuration, tests, documentation, etc.)
+
+2. **API Endpoints** (if applicable)
+   - Extract and document all API routes/endpoints from the codebase
+   - Include HTTP methods, endpoint paths, descriptions, parameters, and responses
+   - Document authentication requirements and error handling for each endpoint
+
+3. **System Architecture**
+   - High-level architecture diagram and description
+   - Component diagrams for key modules
+   - Data flow diagrams and control flow diagrams
+
+4. **Component Design**
+   - Detailed design for each component, including interfaces, inputs, outputs, and dependencies
+   - State diagrams and sequence diagrams for dynamic behavior
+
+5. **Data Design**
+   - Data model diagram (ERD) and description
+   - Data dictionary for all data elements
+
+6. **Interface Design**
+   - API specifications and endpoint documentation
+   - User interface mockups or wireframes
+
+7. **Operational Scenarios**
+   - Description of key scenarios for system operation, including normal and exceptional cases
+   - Use cases or user stories mapping to system functionality
+
+---
+
+### Output Format:
+
+Respond with **ONLY valid JSON** using this enhanced structure:
+
+{
+  "folderStructure": {
+    "tree": "ASCII tree representation of the directory structure",
+    "directories": [
+      {
+        "path": "directory path",
+        "type": "source|config|test|docs|asset|build|dependency",
+        "description": "detailed description of directory purpose",
+        "fileCount": "number of files",
+        "keyFiles": ["list of important files in this directory"]
+      }
+    ]
+  },
+  "apis": [
+    {
+      "endpoint": "API endpoint path",
+      "method": "HTTP method",
+      "description": "endpoint description",
+      "parameters": [
+        {
+          "name": "parameter name",
+          "type": "parameter type",
+          "description": "parameter description"
+        }
+      ],
+      "response": "response description",
+      "internals": {
+        "implementation": "implementation file/location",
+        "validation": "validation details",
+        "errorHandling": "error handling approach",
+        "authentication": "authentication requirements"
+      }
+    }
+  ],
+  "architecture": {
+    "pattern": "architectural pattern used",
+    "description": "architecture overview",
+    "components": [
+      {
+        "name": "component name",
+        "type": "component type",
+        "description": "component description",
+        "responsibilities": ["list of responsibilities"]
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "component name",
+      "type": "component type",
+      "file": "component file location",
+      "description": "component description",
+      "dependencies": ["list of dependencies"],
+      "exports": ["list of exports"],
+      "internals": {
+        "purpose": "component purpose",
+        "keyMethods": ["list of key methods"],
+        "stateManagement": "state management approach",
+        "lifecycle": "component lifecycle"
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "function name",
+      "file": "function file location",
+      "type": "function type",
+      "description": "function description",
+      "parameters": [
+        {
+          "name": "parameter name",
+          "type": "parameter type",
+          "description": "parameter description"
+        }
+      ],
+      "returns": {
+        "type": "return type",
+        "description": "return description"
+      },
+      "internals": {
+        "algorithm": "algorithm description",
+        "complexity": "complexity analysis",
+        "sideEffects": "side effects description",
+        "dependencies": ["function dependencies"]
+      }
+    }
+  ],
+  "dataModels": [
+    {
+      "name": "model name",
+      "type": "model type",
+      "file": "model file location",
+      "properties": [
+        {
+          "name": "property name",
+          "type": "property type",
+          "description": "property description"
+        }
+      ]
+    }
+  ]
+}
+
+---
+
+### Key Requirements:
+
+1. **Folder Structure Tree**: Create a proper ASCII directory tree from the file paths in the aggregated content
+2. **API Extraction**: Scan the code for API routes (app.get, router.post, etc.) and document them systematically
+3. **Real Analysis**: Base all documentation on actual code content, not generic templates
+4. **Comprehensive Coverage**: Include all major components, functions, and data structures found in the code
+
+---
+
+### Guidelines:
+
+- Extract actual folder structure from file paths provided in the aggregated content
+- Identify and document real API endpoints from Express.js routes, FastAPI routes, or similar frameworks
+- Ensure compliance with IEEE 1016 standards for SDDs
+- Use clear, non-technical language in descriptions for broader accessibility
+- Base component and function documentation on actual code analysis
+- Document assumptions, constraints, and dependencies explicitly
+
+---
+Produce documentation that accurately reflects the real codebase structure, API endpoints, and implementation details. Be thorough, precise, and factual in your analysis.`,
+  comprehensiveDocumentationFromFiles: (
+    files: Array<{ path: string; content: string }>,
+    language: string,
+    repositoryName: string,
+    folderTree?: string,
+    apiEndpoints?: Array<{ endpoint: string; method: string; file: string }>
+  ) => `
+You are a senior software architect and documentation expert.
+
+Your task is to analyze the following ${language} codebase and generate comprehensive technical documentation that matches the EXACT JSON structure required.
+
+### Project Details:
+- **Repository**: ${repositoryName}
+- **Language**: ${language}
+- **Files**: ${files.map((f) => f.path).join(", ")}
+- **Folder Structure**: ${folderTree || ""}
+- **API Endpoints**: ${
+    apiEndpoints?.map((api) => `${api.method} ${api.endpoint}`).join(", ") ||
+    "None"
+  }
+
+### Files to analyze:
+${files
+  .map(
+    (f) => `
+## File: ${f.path}
+\`\`\`${
+      f.path.endsWith(".js") || f.path.endsWith(".ts")
+        ? "javascript"
+        : language.toLowerCase()
+    }
+${f.content}
+\`\`\`
+`
+  )
+  .join("\n")}
+
+---
+### Documentation Requirements:
+
+Produce a comprehensive SDD-level documentation set that includes:
+
 1. **Introduction**
    - Purpose, scope, and objectives of the document
    - Overview of the system, its context, and stakeholders
@@ -422,83 +626,185 @@ Produce a comprehensive SDD-level documentation set that includes:
 
 ---
 
-### Output Format:
-
-Respond with **ONLY valid JSON** using this structure:
+### CRITICAL INSTRUCTIONS:
+1. You MUST return ONLY valid JSON
+2. Do NOT include any explanatory text before or after the JSON
+3. Do NOT wrap the JSON in markdown code blocks
+4. Start your response directly with the opening curly brace {
+5. End your response with the closing curly brace }
 
 {
-  "introduction": {
-    "purpose": "Document purpose",
-    "scope": "Document scope",
-    "objectives": "Document objectives",
-    "overview": "System overview"
-  },
+  "Introduction": "Brief overview of the ${repositoryName} project - its purpose, main functionality, and key benefits",
   "architecture": {
-    "highLevelDiagram": "URL or path to high-level diagram",
-    "components": [
+    "pattern": "Primary architectural pattern (e.g., Component-based, MVC, Microservices, Layered)",
+    "description": "Detailed description of the architecture, design decisions, and how components interact",
+    "technologies": ["${language}", "Framework1", "Framework2"],
+    "layers": [
       {
-        "name": "Component name",
-        "description": "Component description",
-        "diagram": "URL or path to component diagram",
-        "dataFlow": "URL or path to data flow diagram",
-        "controlFlow": "URL or path to control flow diagram"
+        "name": "Layer Name",
+        "description": "Layer description",
+        "components": ["Component1", "Component2"]
       }
     ]
   },
-  "componentDesign": [
+  "folderStructure": {
+    "tree": "${folderTree || "Extract from file paths provided"}",
+    "directories": [
+      {
+        "path": "directory/path/",
+        "purpose": "Directory purpose",
+        "type": "source|config|test|docs|assets",
+        "fileCount": 10,
+        "description": "Detailed description of what this directory contains"
+      }
+    ]
+  },
+  "codeInternals": {
+    "codeFlow": "Description of how the application flows from entry point through main components",
+    "keyAlgorithms": [
+      {
+        "name": "Algorithm Name",
+        "description": "What the algorithm does",
+        "file": "file/path.js",
+        "implementation": "How it's implemented",
+        "complexity": "O(n) time complexity"
+      }
+    ],
+    "designPatterns": [
+      {
+        "pattern": "Pattern Name",
+        "usage": "How and where it's used",
+        "files": ["file1.js", "file2.js"],
+        "description": "Why this pattern was chosen"
+      }
+    ],
+    "dataFlow": "How data moves through the system",
+    "businessLogic": [
+      {
+        "module": "Module Name",
+        "purpose": "What business logic it handles",
+        "workflow": "Step-by-step workflow",
+        "files": ["file1.js", "file2.js"]
+      }
+    ]
+  },
+  "components": [
     {
-      "component": "Component name",
-      "interfaces": "List of interfaces",
-      "inputs": "List of inputs",
-      "outputs": "List of outputs",
-      "dependencies": "List of dependencies",
-      "stateDiagrams": "URL or path to state diagram",
-      "sequenceDiagrams": "URL or path to sequence diagram"
+      "name": "Component Name",
+      "type": "component|service|utility",
+      "file": "path/to/file.js",
+      "description": "What this component does",
+      "dependencies": ["dependency1", "dependency2"],
+      "exports": ["export1", "export2"],
+      "internals": {
+        "purpose": "Main purpose of this component",
+        "keyMethods": ["method1", "method2"],
+        "stateManagement": "How state is managed",
+        "lifecycle": "Component lifecycle description"
+      }
     }
   ],
-  "dataDesign": {
-    "dataModelDiagram": "URL or path to data model diagram",
-    "dataDictionary": "URL or path to data dictionary"
-  },
-  "interfaceDesign": {
-    "apiSpecifications": "URL or path to API specifications",
-    "userInterfaceMockups": "URL or path to UI mockups"
-  },
-  "operationalScenarios": [
+  "apis": [
     {
-      "scenario": "Scenario description",
-      "useCases": "List of use cases or user stories"
+      "endpoint": "/api/endpoint",
+      "method": "GET|POST|PUT|DELETE",
+      "description": "What this endpoint does",
+      "parameters": [
+        {
+          "name": "param1",
+          "type": "string",
+          "description": "Parameter description"
+        }
+      ],
+      "response": "Response description",
+      "internals": {
+        "implementation": "How it's implemented internally",
+        "validation": "Validation logic",
+        "errorHandling": "Error handling approach",
+        "authentication": "Auth requirements"
+      }
     }
   ],
-  "deploymentView": {
-    "deploymentDiagram": "URL or path to deployment diagram",
-    "configurationFiles": "URL or path to configuration files",
-    "setupInstructions": "URL or path to setup instructions"
+  "functions": [
+    {
+      "name": "functionName",
+      "file": "path/to/file.js",
+      "type": "utility|business|helper",
+      "description": "What this function does",
+      "parameters": [
+        {
+          "name": "param1",
+          "type": "string",
+          "description": "Parameter description"
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "description": "What it returns"
+      },
+      "internals": {
+        "algorithm": "Algorithm description",
+        "complexity": "Time/space complexity",
+        "sideEffects": "Any side effects",
+        "dependencies": ["dependency1", "dependency2"]
+      }
+    }
+  ],
+  "dataModels": [
+    {
+      "name": "Model Name",
+      "type": "interface|class|schema",
+      "file": "path/to/file.js",
+      "properties": [
+        {
+          "name": "property1",
+          "type": "string",
+          "description": "Property description"
+        }
+      ],
+      "relationships": [
+        {
+          "model": "RelatedModel",
+          "type": "one-to-one|one-to-many|many-to-many",
+          "description": "Relationship description"
+        }
+      ],
+      "validation": ["validation rule 1", "validation rule 2"]
+    }
+  ],
+  "sdlc": {
+    "setupInstructions": [
+      {
+        "step": 1,
+        "title": "Step Title",
+        "description": "Step description",
+        "commands": ["npm install", "npm start"]
+      }
+    ]
   },
-  "qualityAttributes": {
-    "performance": "Performance analysis and tactics",
-    "security": "Security analysis and tactics",
-    "maintainability": "Maintainability analysis and tactics"
-  },
-  "appendices": {
-    "glossary": "URL or path to glossary",
-    "references": "List of references"
-  }
+  "examples": [
+    {
+      "title": "Example Title",
+      "description": "What this example demonstrates",
+      "code": "// Code example here\\nconst example = 'code';",
+      "explanation": "Explanation of the code"
+    }
+  ],
+  "mermaidDiagram": "flowchart TD\\n    A[Start] --> B[Process]\\n    B --> C[End]"
 }
 
 ---
 
-### Guidelines:
+### Requirements:
+1. **Extract Real Data**: Analyze the actual code content provided
+2. **Accurate Folder Structure**: Use the provided folder tree or generate from file paths
+3. **Real API Endpoints**: Extract actual endpoints from the code
+4. **Concrete Components**: Document actual components found in the code
+5. **Proper Mermaid Syntax**: Create a valid Mermaid diagram based on the architecture
+6. **Complete Coverage**: Fill ALL fields with meaningful data from the codebase
 
-- Ensure compliance with IEEE 1016 standards for SDDs.
-- Use clear, non-technical language in the introduction for stakeholder understanding.
-- Provide high-quality, legible diagrams with proper labeling and legends.
-- Include all relevant details for each component to enable independent development and testing.
-- Document assumptions, constraints, and dependencies explicitly.
-- Review and validate documentation completeness and accuracy with project stakeholders.
-
----
-Produce documentation that would enable a new developer to understand and work with the system effectively, and provide stakeholders with a clear understanding of the system architecture, components, and interactions. Be thorough, precise, and clear in your documentation generation.`,
+**CRITICAL**: Return ONLY the JSON object. No explanations, no markdown, no wrapper text.
+`,
   sddReadme: (project: SDDProjectInput) => `
 You are a professional-grade software architect and technical writer with expertise in IEEE 1016 Software Design Description standards and modern documentation practices.
 

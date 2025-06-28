@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Modal } from "../../hooks/modal-hook";
 import { Button } from "../../ui/button";
@@ -44,10 +44,11 @@ interface RepoImportModalProps {
   onImport: (repo: Repository) => void;
 }
 
-export const RepoImportModal: React.FC<RepoImportModalProps> = ({
+export const RepoImportModal = memo<RepoImportModalProps>(function RepoModal({
   isOpen,
   onClose,
-}) => {
+  onImport,
+}) {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [filteredRepos, setFilteredRepos] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(false);
@@ -500,4 +501,5 @@ export const RepoImportModal: React.FC<RepoImportModalProps> = ({
       </div>
     </Modal>
   );
-};
+});
+

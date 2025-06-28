@@ -53,24 +53,20 @@ export interface AnalysisResults {
   };
   documentation?: ComprehensiveDocumentation;
   testCases?: {
-    testCases: {
-      name: string;
-      type: string;
-      priority: string;
-      description: string;
-      code: string;
-    }[];
+    testCases: TestCase[]; // Use the proper TestCase interface
     coverage: number;
     framework: string;
+    summary?: string; // Add this if your AI returns a summary
   };
 }
 
 export interface TestCase {
   name: string;
-  type: string;
+  type: "unit" | "integration" | "e2e"; // Make this a literal type instead of string
   priority: "high" | "medium" | "low";
   description: string;
   code: string;
+  file?: string; // Add this if your test cases include file references
 }
 
 export interface TestCasesTabProps {

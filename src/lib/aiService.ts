@@ -11,6 +11,8 @@ import {
   fallbackStructureAnalysis,
   fallbackTestGenerationFromStructure,
   fallbackComprehensiveDocumentationFromFiles,
+  createFolderStructureTree,
+  extractApiEndpoints,
 } from "../helper/fallback";
 import { isCodeFile, parseAiJsonResponse } from "@/helper/utils";
 
@@ -177,51 +179,221 @@ export class AIAnalyzer {
     language: string,
     repositoryName: string
   ) {
-    const files = parsedData.files.map((file) => ({
-      path: file.path,
-      content: file.content,
-    }));
+    console.log("🔍 generateComprehensiveDocumentation called with:", {
+      language,
+      repositoryName,
+      totalFiles: parsedData.totalFiles,
+      filesCount: parsedData.files?.length || 0,
+    });
+
+    const files =
+      parsedData.files?.map((file) => ({
+        path: file.path || "",
+        content: file.content || "",
+      })) || [];
 
     const validFiles = files.filter(
-      (f) => f.content && f.content.trim().length > 10
+      (f) =>
+        f.path && f.path.length > 0 && f.content && f.content.trim().length > 10
     );
+
+    console.log("📁 Valid files found:", validFiles.length);
+
     if (validFiles.length === 0) {
+      console.log("⚠️ No valid files found, using fallback");
       return fallbackComprehensiveDocumentationFromFiles(
-        [],
+        files,
         language,
         repositoryName
       );
     }
 
-    const maxFiles = 6;
-    const maxFileContentLength = 2000;
+    const maxFiles = 6; // Reduced to avoid token limits
+    const maxFileContentLength = 2500; // Reduced content length
     const selectedFiles = validFiles.slice(0, maxFiles).map((f) => ({
       path: f.path,
       content:
-        f.content.length > maxFileContentLength
+        f.content && f.content.length > maxFileContentLength
           ? f.content.substring(0, maxFileContentLength) + "\n...(truncated)"
-          : f.content,
+          : f.content || "",
     }));
 
-    let aggregatedContent = `Repository: ${repositoryName}\nLanguage: ${language}\n\n`;
-    for (const file of selectedFiles) {
-      aggregatedContent += `\n=== FILE: ${file.path} ===\n\n${file.content}\n\n=== END FILE ===\n`;
-    }
+    // Generate folder structure tree using the utility function
+    const folderTree = createFolderStructureTree(files, repositoryName);
 
-    const prompt = PROMPTS.comprehensiveDocumentation(
+    // Extract API endpoints using the utility function
+    const apiEndpoints: any = extractApiEndpoints(validFiles);
+
+    const prompt = PROMPTS.comprehensiveDocumentationFromFiles(
+      selectedFiles,
       language,
       repositoryName,
-      aggregatedContent
+      folderTree,
+      apiEndpoints
     );
+
+    console.log("📝 Sending prompt to AI...");
 
     try {
       const response = await generateAiResponse(
         [{ role: "user", content: prompt }],
-        { maxTokens: 8192 }
+        {
+          maxTokens: 6144, // Reduced token limit
+          temperature: 0.3, // Lower temperature for more consistent JSON
+        }
       );
-      return parseAiJsonResponse(response);
+
+      console.log("🔍 Raw AI response type:", typeof response);
+      console.log("🔍 Raw AI response length:", response.length);
+      console.log("🔍 Raw AI response preview:", response.substring(0, 300));
+
+      // Enhanced JSON parsing with multiple fallback strategies
+      let result;
+      try {
+        result = parseAiJsonResponse(response);
+      } catch (parseError) {
+        console.warn(
+          "⚠️ Initial JSON parsing failed, trying alternative strategies..."
+        );
+
+        // Strategy 1: Try to extract JSON from response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            result = JSON.parse(jsonMatch[0]);
+            console.log("✅ Successfully extracted JSON using regex");
+          } catch (regexError) {
+            console.warn("❌ Regex JSON extraction failed");
+          }
+        }
+
+        // Strategy 2: Try to clean and parse
+        if (!result) {
+          try {
+            let cleaned = response
+              .replace(/```json/g, "")
+              .replace(/```/g, "")
+              .replace(/^\s*[\r\n]/gm, "")
+              .trim();
+
+            // Find first { and last }
+            const firstBrace = cleaned.indexOf("{");
+            const lastBrace = cleaned.lastIndexOf("}");
+
+            if (
+              firstBrace !== -1 &&
+              lastBrace !== -1 &&
+              lastBrace > firstBrace
+            ) {
+              cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+              result = JSON.parse(cleaned);
+              console.log("✅ Successfully parsed cleaned JSON");
+            }
+          } catch (cleanError) {
+            console.warn("❌ Cleaned JSON parsing failed");
+          }
+        }
+
+        // If all parsing strategies fail, use fallback
+        if (!result) {
+          console.error(
+            "❌ All JSON parsing strategies failed, using fallback"
+          );
+          throw parseError;
+        }
+      }
+
+      console.log("✅ Parsed documentation type:", typeof result);
+      console.log("✅ Parsed documentation keys:", Object.keys(result || {}));
+
+      // Validate and enhance the result structure
+      if (result && typeof result === "object") {
+        // Ensure required fields exist with fallback values
+        if (!result.summary) {
+          result.summary = `${repositoryName} is a ${language} application with ${validFiles.length} source files.`;
+        }
+
+        if (!result.folderStructure) {
+          result.folderStructure = {
+            tree: folderTree,
+            directories: [],
+          };
+        } else if (!result.folderStructure.tree) {
+          result.folderStructure.tree = folderTree;
+        }
+
+        if (!result.apis && apiEndpoints.length > 0) {
+          result.apis = apiEndpoints;
+        }
+
+        if (!result.architecture) {
+          result.architecture = {
+            pattern: "Component-based",
+            description:
+              "The application follows a modular component-based architecture.",
+            technologies: [language],
+            layers: [],
+          };
+        }
+
+        if (!result.codeInternals) {
+          result.codeInternals = {
+            codeFlow:
+              "The application starts from the main entry point and processes through various components.",
+            keyAlgorithms: [],
+            designPatterns: [],
+            dataFlow:
+              "Data flows through the application layers from input to output.",
+            businessLogic: [],
+          };
+        }
+
+        if (!result.components) {
+          result.components = [];
+        }
+
+        if (!result.functions) {
+          result.functions = [];
+        }
+
+        if (!result.dataModels) {
+          result.dataModels = [];
+        }
+
+        if (!result.sdlc) {
+          result.sdlc = {
+            setupInstructions: [
+              {
+                step: 1,
+                title: "Install Dependencies",
+                description: "Install project dependencies",
+                commands: ["npm install"],
+              },
+            ],
+          };
+        }
+
+        if (!result.examples) {
+          result.examples = [];
+        }
+
+        if (!result.mermaidDiagram) {
+          result.mermaidDiagram = `flowchart TD
+    A[Application Start] --> B[Main Components]
+    B --> C[Business Logic]
+    C --> D[Data Layer]
+    D --> E[Output]`;
+        }
+
+        console.log("✅ Documentation structure validated and enhanced");
+      }
+
+      return result;
     } catch (error) {
-      console.error("AI comprehensive documentation generation failed:", error);
+      console.error(
+        "❌ AI comprehensive documentation generation failed:",
+        error
+      );
       console.log("🔄 Using fallback documentation...");
       return fallbackComprehensiveDocumentationFromFiles(
         selectedFiles,

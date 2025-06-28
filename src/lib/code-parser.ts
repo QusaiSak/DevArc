@@ -918,6 +918,28 @@ export class CodeParser {
 
   private detectLanguage(filePath: string): string {
     const extension = filePath.split(".").pop()?.toLowerCase();
+    const fileName = filePath.split("/").pop()?.toLowerCase() || "";
+
+    // Special handling for backend files
+    if (
+      fileName.includes("server") ||
+      fileName.includes("backend") ||
+      fileName.includes("api") ||
+      fileName.includes("routes") ||
+      filePath.toLowerCase().includes("/server/") ||
+      filePath.toLowerCase().includes("/backend/") ||
+      filePath.toLowerCase().includes("/api/")
+    ) {
+      if (extension === "js" || extension === "mjs")
+        return "backend_javascript";
+      if (extension === "ts") return "backend_typescript";
+      if (extension === "py") return "backend_python";
+      if (extension === "java") return "backend_java";
+      if (extension === "cs") return "backend_csharp";
+      if (extension === "php") return "backend_php";
+      if (extension === "rb") return "backend_ruby";
+      if (extension === "go") return "backend_go";
+    }
 
     const languageMap: Record<string, string> = {
       js: "javascript",
@@ -1109,4 +1131,178 @@ export class CodeParser {
 
     return functionBody;
   }
+}
+
+export async function parseRepositoryStructure(
+  files: any[],
+  language: string = "javascript"
+): Promise<any> {
+  const structure: any = {
+    totalFiles: 0,
+    totalLines: 0,
+    complexity: { average: 0, max: 0, files: [] },
+    patterns: {
+      framework: [],
+      architecture: [],
+      designPatterns: [],
+    },
+    dependencies: [],
+    testCoverage: 0,
+    issues: [],
+    performance: { score: 0, bottlenecks: [] },
+    security: { score: 0, vulnerabilities: [] },
+    documentation: { coverage: 0, quality: 0 },
+    maintainability: 0,
+  };
+
+  if (!files || files.length === 0) {
+    return structure;
+  }
+
+  // Filter valid files - include more file types and backend files
+  const validFiles = files.filter((file) => {
+    if (!file.content || !file.path) return false;
+
+    // Exclude common build/temp directories
+    const excludePaths = [
+      "node_modules",
+      ".git",
+      "dist",
+      "build",
+      ".next",
+      "coverage",
+      ".nyc_output",
+      "tmp",
+      "temp",
+    ];
+
+    // Check if file is in excluded directory
+    const isExcluded = excludePaths.some(
+      (exclude) =>
+        file.path.toLowerCase().includes(`/${exclude}/`) ||
+        file.path.toLowerCase().includes(`\\${exclude}\\`) ||
+        file.path.toLowerCase().startsWith(`${exclude}/`) ||
+        file.path.toLowerCase().startsWith(`${exclude}\\`)
+    );
+
+    if (isExcluded) return false;
+
+    // Include more file extensions for better backend support
+    const validExtensions = [
+      ".js",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".py",
+      ".java",
+      ".cs",
+      ".go",
+      ".rs",
+      ".php",
+      ".rb",
+      ".cpp",
+      ".c",
+      ".h",
+      ".hpp",
+      ".swift",
+      ".kt",
+      ".scala",
+      ".json",
+      ".yaml",
+      ".yml",
+      ".xml",
+      ".html",
+      ".css",
+      ".scss",
+      ".less",
+      ".md",
+      ".txt",
+      ".sql",
+      ".sh",
+      ".bat",
+      ".ps1",
+      ".dockerfile",
+    ];
+
+    const hasValidExtension = validExtensions.some((ext) =>
+      file.path.toLowerCase().endsWith(ext)
+    );
+
+    // Include files with no extension if they're in server/api directories
+    const isServerFile =
+      file.path.includes("/server/") ||
+      file.path.includes("/api/") ||
+      file.path.includes("\\server\\") ||
+      file.path.includes("\\api\\");
+
+    return hasValidExtension || isServerFile;
+  });
+
+  structure.totalFiles = validFiles.length;
+
+  const parsedFiles: ParsedFile[] = [];
+  for (const file of validFiles) {
+    const parser = new CodeParser();
+    const parsedFile = parser.parseFile(file.path, file.content);
+    parsedFiles.push(parsedFile);
+  }
+
+  structure.totalLines = parsedFiles.reduce((sum, file) => sum + file.lines, 0);
+
+  // Analyze complexity
+  const complexityFiles = parsedFiles.map((file) => ({
+    path: file.path,
+    complexity: file.complexity,
+  }));
+
+  structure.complexity.files = complexityFiles;
+  structure.complexity.average =
+    complexityFiles.reduce((sum, file) => sum + file.complexity, 0) /
+      complexityFiles.length || 0;
+  structure.complexity.max = complexityFiles.reduce(
+    (max, file) => Math.max(max, file.complexity),
+    0
+  );
+
+  // Enhanced framework detection with better backend support
+  const frameworkPatterns: any = {
+    React: /import.*from ['"]react['"]/g,
+    Vue: /import.*from ['"]vue['"]/g,
+    Angular: /@angular|ng-|angular\.module/g,
+    Express:
+      /express\(\)|app\.get|app\.post|router\.|const\s+express|require\(['"]express['"]\)/g,
+    "Next.js": /next\/|getServerSideProps|getStaticProps/g,
+    Svelte: /svelte|\.svelte/g,
+    "Node.js":
+      /require\(|module\.exports|process\.env|const\s+\w+\s*=\s*require/g,
+    TypeScript: /interface\s+\w+|type\s+\w+\s*=|\.ts$|\.tsx$/g,
+    Fastify: /fastify|\.register\(|\.listen\(/g,
+    Koa: /const\s+Koa|require\(['"]koa['"]\)|ctx\.body/g,
+    NestJS: /@nestjs|@Controller|@Injectable|@Module/g,
+    Django: /from\s+django|django\.contrib|models\.Model/g,
+    Flask: /from\s+flask|Flask\(__name__\)|@app\.route/g,
+    FastAPI: /from\s+fastapi|FastAPI\(|@app\.(get|post|put|delete)/g,
+    "Spring Boot":
+      /@SpringBootApplication|@RestController|@Service|@Repository/g,
+    "ASP.NET": /using\s+Microsoft\.AspNetCore|Controller|ActionResult/g,
+    GraphQL: /graphql|type\s+Query|type\s+Mutation|apollo/g,
+    "Socket.io": /socket\.io|io\(|socket\.on|socket\.emit/g,
+    Prisma: /prisma|@prisma\/client|\$\w+\.findMany/g,
+    MongoDB: /mongoose|MongoClient|\.find\(\)|\.insertOne/g,
+    Redis: /redis|\.set\(|\.get\(|RedisClient/g,
+  };
+
+  for (const framework in frameworkPatterns) {
+    const pattern = frameworkPatterns[framework];
+    for (const file of parsedFiles) {
+      if (pattern.test(file.content)) {
+        structure.patterns.framework.push(framework);
+        break;
+      }
+    }
+  }
+
+  structure.patterns.framework = [...new Set(structure.patterns.framework)]; // Ensure unique values
+
+  return structure;
 }

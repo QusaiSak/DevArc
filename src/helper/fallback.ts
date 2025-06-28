@@ -1,63 +1,227 @@
 import type { ProjectData } from "@/types/ai.interface";
 import type { ProjectStructure } from "@/types/codeparser.interface";
 
-// Utility function for folder structure tree (copy from aiService if needed)
-function createFolderStructureTree(
+// Utility function for folder structure tree
+export function createFolderStructureTree(
   files: Array<{ path: string; content: string }>,
   repositoryName: string
 ): string {
   if (!files || files.length === 0) {
     return `${repositoryName}/\n└── (empty)`;
   }
-  const structure: Record<string, string[]> = {};
-  const directories = new Set<string>();
-  files.forEach((file) => {
-    const parts = file.path.split("/");
-    let currentPath = "";
+
+  // Build directory tree structure
+  const tree: Record<string, any> = {};
+
+  // Filter and process files
+  const validFiles = files.filter((f) => f.path && f.path.trim().length > 0);
+
+  validFiles.forEach((file) => {
+    // Handle both forward and backward slashes, and normalize paths
+    const normalizedPath = file.path
+      .replace(/\\/g, "/")
+      .replace(/^\/+|\/+$/g, "");
+    if (!normalizedPath) return;
+
+    const parts = normalizedPath.split("/").filter((part) => part.length > 0);
+    if (parts.length === 0) return;
+
+    let current = tree;
+
+    // Navigate through directory structure
     for (let i = 0; i < parts.length - 1; i++) {
-      currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
-      directories.add(currentPath);
+      const part = parts[i];
+      if (!current[part]) {
+        current[part] = {};
+      }
+      current = current[part];
     }
-    const dir = parts.slice(0, -1).join("/") || ".";
+
+    // Add file to the directory
     const fileName = parts[parts.length - 1];
-    if (!structure[dir]) structure[dir] = [];
-    structure[dir].push(fileName);
+    if (fileName && fileName.trim().length > 0) {
+      current[fileName] = null; // null indicates it's a file
+    }
   });
-  const sortedDirs = Array.from(directories).sort();
-  Object.keys(structure).forEach((dir) => structure[dir].sort());
-  let tree = `${repositoryName}/\n`;
-  const allPaths = [
-    ...sortedDirs,
-    ...Object.keys(structure).filter((dir) => dir !== "."),
-  ];
-  const uniquePaths = [...new Set(allPaths)].sort();
-  if (structure["."]) {
-    structure["."].forEach((file, index) => {
-      const isLast =
-        index === structure["."].length - 1 && uniquePaths.length === 0;
-      tree += `${isLast ? "└── " : "├── "}${file}\n`;
+
+  // Function to render tree with proper indentation
+  function renderTree(
+    node: any,
+    prefix: string = "",
+    isLast: boolean = true
+  ): string {
+    let result = "";
+    const entries = Object.keys(node).sort((a, b) => {
+      // Directories first, then files
+      const aIsDir = node[a] !== null;
+      const bIsDir = node[b] !== null;
+      if (aIsDir && !bIsDir) return -1;
+      if (!aIsDir && bIsDir) return 1;
+      return a.localeCompare(b);
     });
+
+    entries.forEach((key, index) => {
+      const isLastEntry = index === entries.length - 1;
+      const isDirectory = node[key] !== null;
+      const connector = isLastEntry ? "└── " : "├── ";
+      const name = isDirectory ? `${key}/` : key;
+
+      result += `${prefix}${connector}${name}\n`;
+
+      if (isDirectory && Object.keys(node[key]).length > 0) {
+        const newPrefix = prefix + (isLastEntry ? "    " : "│   ");
+        result += renderTree(node[key], newPrefix, isLastEntry);
+      }
+    });
+
+    return result;
   }
-  uniquePaths.forEach((path, pathIndex) => {
-    if (path === ".") return;
-    const isLastPath = pathIndex === uniquePaths.length - 1;
-    const depth = path.split("/").length;
-    const indent = "│   ".repeat(depth - 1);
-    const connector = isLastPath ? "└── " : "├── ";
-    const dirName = path.split("/").pop();
-    tree += `${indent}${connector}${dirName}/\n`;
-    if (structure[path]) {
-      structure[path].forEach((file, fileIndex) => {
-        const isLastFile = fileIndex === structure[path].length - 1;
-        const fileIndent = isLastPath
-          ? "    ".repeat(depth)
-          : "│   ".repeat(depth);
-        const fileConnector = isLastFile ? "└── " : "├── ";
-        tree += `${fileIndent}${fileConnector}${file}\n`;
+
+  return `${repositoryName}/\n${renderTree(tree)}`.trim();
+}
+
+// Function to extract API endpoints from files
+export function extractApiEndpoints(
+  files: Array<{ path: string; content: string }>
+): Array<{
+  endpoint: string;
+  method: string;
+  description: string;
+  parameters: Array<{ name: string; type: string; description: string }>;
+  response: string;
+  internals: {
+    implementation: string;
+    validation: string;
+    errorHandling: string;
+    authentication: string;
+  };
+}> {
+  const endpoints: Array<any> = [];
+
+  files.forEach((file) => {
+    // Check for API files more comprehensively
+    const isApiFile =
+      file.path.includes("api/") ||
+      file.path.includes("routes/") ||
+      file.path.includes("server/") ||
+      file.path.includes("backend/") ||
+      file.content.includes("router.") ||
+      file.content.includes("app.") ||
+      file.content.includes("express()") ||
+      file.content.includes("fastify") ||
+      file.content.includes("@app.route") ||
+      file.content.includes("@RestController") ||
+      (file.content.includes("def ") && file.content.includes("request"));
+
+    if (isApiFile) {
+      // Extract Express.js/Node.js routes
+      const routeMatches = file.content.match(
+        /router\.(get|post|put|delete|patch)\s*\(\s*["'`]([^"'`]+)["'`]/g
+      );
+      const appMatches = file.content.match(
+        /app\.(get|post|put|delete|patch)\s*\(\s*["'`]([^"'`]+)["'`]/g
+      );
+
+      // Extract Flask routes
+      const flaskMatches = file.content.match(
+        /@app\.route\s*\(\s*["'`]([^"'`]+)["'`][\s\S]*?methods\s*=\s*\[["'`]([^"'`]+)["'`]\]/g
+      );
+
+      // Extract FastAPI routes
+      const fastapiMatches = file.content.match(
+        /@app\.(get|post|put|delete|patch)\s*\(\s*["'`]([^"'`]+)["'`]/g
+      );
+
+      const allMatches = [
+        ...(routeMatches || []),
+        ...(appMatches || []),
+        ...(fastapiMatches || []),
+      ];
+
+      // Handle Flask routes separately
+      if (flaskMatches) {
+        flaskMatches.forEach((match) => {
+          const routeMatch = match.match(
+            /@app\.route\s*\(\s*["'`]([^"'`]+)["'`]/
+          );
+          const methodMatch = match.match(
+            /methods\s*=\s*\[["'`]([^"'`]+)["'`]\]/
+          );
+
+          if (routeMatch && methodMatch) {
+            const endpoint = routeMatch[1];
+            const method = methodMatch[1].toUpperCase();
+
+            endpoints.push({
+              endpoint: endpoint.startsWith("/") ? endpoint : `/${endpoint}`,
+              method,
+              description: `${method} ${endpoint} (Flask route)`,
+              parameters: [],
+              response: "JSON response",
+              internals: {
+                implementation: file.path,
+                validation: "Flask request validation",
+                errorHandling: "Flask error handling",
+                authentication: endpoint.includes("auth")
+                  ? "Required"
+                  : "Check implementation",
+              },
+            });
+          }
+        });
+      }
+
+      allMatches.forEach((match) => {
+        const methodMatch = match.match(/(get|post|put|delete|patch)/);
+        const endpointMatch = match.match(/["'`]([^"'`]+)["'`]/);
+
+        if (methodMatch && endpointMatch) {
+          const method = methodMatch[1].toUpperCase();
+          const endpoint = endpointMatch[1];
+
+          // Try to find comments or descriptions near the route
+          const lines = file.content.split("\n");
+          let description = `${method} ${endpoint}`;
+
+          for (let i = 0; i < lines.length; i++) {
+            if (
+              lines[i].includes(endpoint) &&
+              lines[i].includes(method.toLowerCase())
+            ) {
+              // Look for comments above or below
+              if (i > 0 && lines[i - 1].trim().startsWith("//")) {
+                description = lines[i - 1].replace("//", "").trim();
+              } else if (
+                i < lines.length - 1 &&
+                lines[i + 1].trim().startsWith("//")
+              ) {
+                description = lines[i + 1].replace("//", "").trim();
+              }
+              break;
+            }
+          }
+
+          endpoints.push({
+            endpoint: endpoint.startsWith("/") ? endpoint : `/${endpoint}`,
+            method,
+            description,
+            parameters: [],
+            response: "JSON response",
+            internals: {
+              implementation: `${file.path}`,
+              validation: "Express middleware validation",
+              errorHandling: "Standard Express error handling",
+              authentication: endpoint.includes("auth")
+                ? "Required"
+                : "Check implementation",
+            },
+          });
+        }
       });
     }
   });
-  return tree.trim();
+
+  return endpoints;
 }
 
 export function fallbackSDLCRecommendation(projectData: ProjectData) {
@@ -174,233 +338,253 @@ export function fallbackTestGenerationFromStructure(
   };
 }
 
-export function fallbackComprehensiveDocumentationFromFiles(
-  files: Array<{ path: string; content: string }>,
+export const fallbackComprehensiveDocumentationFromFiles = (
+  files: { path: string; content: string }[],
   language: string,
   repositoryName: string
-) {
-  const fileList =
-    files.length > 0
-      ? files.map((f) => f.path).join(", ")
-      : "No files available";
+) => {
+  // Create a proper file structure overview - ensure we have actual file paths
+  const validFiles = files.filter((f) => f.path && f.path.length > 0);
+
+  // Generate folder structure tree
+  const folderTree = createFolderStructureTree(validFiles, repositoryName);
+
+  // Extract API endpoints
+  const apiEndpoints = extractApiEndpoints(validFiles);
+
+  // Create directory analysis
+  const directories = Array.from(
+    new Set(validFiles.map((f) => f.path.split("/")[0]).filter((dir) => dir))
+  ).map((dir) => {
+    const dirFiles = validFiles.filter((f) => f.path.startsWith(dir + "/"));
+    return {
+      path: dir,
+      type:
+        dir === "src"
+          ? "source"
+          : dir === "test"
+          ? "test"
+          : dir === "config"
+          ? "config"
+          : "other",
+      description: `${dir} directory containing ${dirFiles.length} files`,
+      fileCount: dirFiles.length,
+      purpose:
+        dir === "src"
+          ? "Main source code directory"
+          : dir === "components"
+          ? "Reusable UI components"
+          : dir === "pages"
+          ? "Application pages/routes"
+          : dir === "lib"
+          ? "Utility libraries and services"
+          : dir === "helper"
+          ? "Helper functions and utilities"
+          : dir === "types"
+          ? "TypeScript type definitions"
+          : dir === "server"
+          ? "Backend server code"
+          : `${dir} directory`,
+    };
+  });
+
+  // Extract components from React/Vue files
+  const components = validFiles
+    .filter(
+      (f) =>
+        f.path.endsWith(".tsx") ||
+        f.path.endsWith(".jsx") ||
+        f.path.endsWith(".vue")
+    )
+    .map((f) => {
+      const componentName =
+        f.path
+          .split("/")
+          .pop()
+          ?.replace(/\.(tsx|jsx|vue)$/, "") || "Unknown";
+      return {
+        name: componentName,
+        type: f.path.includes("/pages/")
+          ? "page"
+          : f.path.includes("/components/")
+          ? "component"
+          : "module",
+        file: f.path,
+        description: `${componentName} ${
+          f.path.includes("/pages/") ? "page" : "component"
+        }`,
+        dependencies: [],
+      };
+    });
+
+  // Detect architecture pattern
+  let architecturePattern = "Component-based";
+  if (
+    validFiles.some(
+      (f) => f.path.includes("mvc") || f.path.includes("controller")
+    )
+  ) {
+    architecturePattern = "MVC (Model-View-Controller)";
+  } else if (
+    validFiles.some(
+      (f) => f.path.includes("pages") && f.path.includes("components")
+    )
+  ) {
+    architecturePattern = "Component-based Architecture";
+  } else if (
+    validFiles.some(
+      (f) => f.path.includes("server") && f.path.includes("client")
+    )
+  ) {
+    architecturePattern = "Client-Server Architecture";
+  }
+
+  // Detect technologies
+  const technologies = [];
+  if (
+    validFiles.some(
+      (f) => f.content.includes("react") || f.path.endsWith(".tsx")
+    )
+  ) {
+    technologies.push("React", "TypeScript");
+  }
+  if (
+    validFiles.some(
+      (f) => f.content.includes("express") || f.content.includes("app.get")
+    )
+  ) {
+    technologies.push("Express.js", "Node.js");
+  }
+  if (
+    validFiles.some(
+      (f) => f.content.includes("vite") || f.path.includes("vite")
+    )
+  ) {
+    technologies.push("Vite");
+  }
+  if (validFiles.some((f) => f.content.includes("tailwind"))) {
+    technologies.push("Tailwind CSS");
+  }
+
   return {
-    summary: `${repositoryName} is a ${language} application. AI-powered analysis is currently unavailable, but the codebase includes the following files: ${fileList}`,
+    summary: `${repositoryName} is a ${language} application built with ${
+      technologies.length > 0
+        ? technologies.join(", ")
+        : "modern web technologies"
+    }. The project follows a ${architecturePattern.toLowerCase()} with ${
+      validFiles.length
+    } files organized across ${directories.length} main directories.`,
+
     architecture: {
-      pattern: "Component-based Architecture",
-      description: `The application follows a ${language} component-based architecture with clear separation of concerns.`,
-      technologies: [language, "Modern Development Stack"],
+      pattern: architecturePattern,
+      description: `The application follows a ${architecturePattern.toLowerCase()} where components are organized into logical directories for maintainability and scalability.`,
+      technologies:
+        technologies.length > 0 ? technologies : [language, "Web Technologies"],
       layers: [
         {
           name: "Presentation Layer",
-          description: "User interface and presentation logic",
-          components: files
-            .filter((f) => f.path.includes("component"))
-            .map((f) => f.path),
+          description: "User interface components and pages",
+          components: components
+            .filter((c) => c.type === "component" || c.type === "page")
+            .map((c) => c.name),
         },
         {
           name: "Business Logic Layer",
-          description: "Core application logic and business rules",
-          components: files
+          description: "Application logic and services",
+          components: validFiles
             .filter(
-              (f) => f.path.includes("service") || f.path.includes("lib")
+              (f) => f.path.includes("/lib/") || f.path.includes("/helper/")
             )
-            .map((f) => f.path),
-        },
-        {
-          name: "Data Layer",
-          description: "Data access and management",
-          components: files
-            .filter(
-              (f) => f.path.includes("model") || f.path.includes("interface")
+            .map(
+              (f) =>
+                f.path
+                  .split("/")
+                  .pop()
+                  ?.replace(/\.[^.]+$/, "") || ""
             )
-            .map((f) => f.path),
+            .filter((n) => n),
         },
       ],
     },
+
     folderStructure: {
-      tree: createFolderStructureTree(files, repositoryName),
-      directories: [
-        {
-          path: "src/",
-          purpose: "Main source code directory",
-          type: "source" as const,
-          fileCount: files.filter((f) => f.path.startsWith("src/")).length,
-          description:
-            "Contains the main application source code including components, services, and utilities",
-        },
-      ],
+      tree: folderTree,
+      directories: directories,
     },
+
+    components: components,
+
+    apis: apiEndpoints,
+
     codeInternals: {
-      codeFlow: `The application follows a standard ${language} execution flow with initialization, main processing, and cleanup phases.`,
+      codeFlow: `The application starts from the main entry point and routes through various components. ${
+        components.length > 0
+          ? `Key components include ${components
+              .slice(0, 3)
+              .map((c) => c.name)
+              .join(", ")}.`
+          : ""
+      }`,
       keyAlgorithms: [
         {
-          name: "Standard Processing",
-          description: "Basic application processing logic",
-          file: "main application file",
-          complexity: "O(n)",
-          implementation: "Standard implementation patterns",
+          name: "Component Rendering",
+          description: "React component lifecycle and rendering process",
+          complexity: "O(n) where n is number of components",
+          file: "src/components/",
         },
       ],
       designPatterns: [
         {
-          pattern: "Module Pattern",
-          usage: "Used for organizing code into reusable modules",
-          files: files.map((f) => f.path),
-          description: "Better code organization and maintainability",
-        },
-      ],
-      dataFlow:
-        "Data flows from input through processing layers to output with validation at each stage",
-      businessLogic: [
-        {
-          module: "Core Application",
-          purpose: "Main application functionality",
-          workflow: "Standard processing workflow",
-          files: files.map((f) => f.path),
+          pattern: "Component Pattern",
+          description: "Reusable UI components with props and state management",
+          usage: "Used throughout the application for UI composition",
+          files: components.map((c) => c.file),
         },
       ],
     },
+
     sdlc: {
-      developmentWorkflow:
-        "Standard development workflow with version control, code review, and continuous integration",
       setupInstructions: [
         {
           step: 1,
-          title: "Clone Repository",
-          description: "Clone the repository to your local machine",
-          commands: ["git clone <repository-url>"],
+          title: "Install Dependencies",
+          description: "Install all required project dependencies",
+          commands: ["npm install", "yarn install"],
         },
         {
           step: 2,
-          title: "Install Dependencies",
-          description: "Install project dependencies",
-          commands: ["npm install", "yarn install"],
+          title: "Start Development Server",
+          description: "Run the development server",
+          commands: ["npm run dev", "yarn dev"],
+        },
+        {
+          step: 3,
+          title: "Build for Production",
+          description: "Create production build",
+          commands: ["npm run build", "yarn build"],
         },
       ],
-      buildProcess: {
-        description: `Standard ${language} build process`,
-        steps: [
-          "Install dependencies",
-          "Run build command",
-          "Generate output",
-        ],
-        tools: ["Package manager", "Build tools", "Bundler"],
-      },
-      testingStrategy: {
-        approach: "Unit testing with integration tests",
-        testTypes: ["unit", "integration", "e2e"],
-        coverage: "Target 80%+ code coverage",
-        frameworks: ["Standard testing framework"],
-      },
-      deploymentGuide: {
-        process: "Automated deployment through CI/CD pipeline",
-        environments: ["development", "staging", "production"],
-        steps: [
-          {
-            environment: "development",
-            steps: [
-              "Build application",
-              "Run tests",
-              "Deploy to dev environment",
-            ],
-          },
-        ],
-      },
-      maintenance: {
-        guidelines: [
-          "Regular code reviews",
-          "Keep dependencies updated",
-          "Monitor performance",
-        ],
-        monitoring: [
-          "Application logs",
-          "Performance metrics",
-          "Error tracking",
-        ],
-        troubleshooting: [
-          {
-            issue: "Application not starting",
-            solution:
-              "Check logs for errors and verify environment configuration",
-          },
-        ],
-      },
     },
-    components: files.map((f) => ({
-      name: f.path.split("/").pop() || f.path,
-      type: f.path.includes("component") ? "Component" : "File",
-      file: f.path,
-      description: "Component/file in the codebase",
-      dependencies: [] as string[],
-      exports: [] as string[],
-      internals: {
-        purpose: "Core application functionality",
-        keyMethods: ["main", "init", "process"],
-        stateManagement: "Local state management",
-        lifecycle: "Standard lifecycle",
-      },
-    })),
-    apis: [
-      {
-        endpoint: "/api/health",
-        method: "GET",
-        description: "Health check endpoint",
-        parameters: [],
-        response: '{ "status": "ok" }',
-        internals: {
-          implementation: "Health controller",
-          validation: "Basic validation",
-          errorHandling: "Standard error handling",
-          authentication: "No authentication required",
-        },
-      },
-    ],
-    functions: [
-      {
-        name: "main",
-        file: "main application file",
-        type: "function",
-        description: "Main application entry point",
-        parameters: [],
-        returns: {
-          type: "void",
-          description: "No return value",
-        },
-        internals: {
-          algorithm: "Simple initialization and startup",
-          complexity: "O(1)",
-          sideEffects: "None",
-          dependencies: [],
-        },
-      },
-    ],
-    dataModels: [
-      {
-        name: "ApplicationConfig",
-        type: "Interface",
-        file: "config file",
-        properties: [
-          {
-            name: "environment",
-            type: "string",
-            description: "Application environment",
-          },
-        ],
-        relationships: [],
-        validation: ["Required field validation"],
-      },
-    ],
-    mermaidDiagram:
-      "graph TD\nA[User] --> B[" +
-      repositoryName +
-      " Application]\nB --> C[Business Logic]\nC --> D[Data Layer]",
+
     examples: [
       {
-        title: "Basic Usage",
-        description: "How to use the main application",
-        code: `// Example usage\n// Initialize application\n// Process data\n// Return results`,
-        explanation: "This shows the basic application flow",
+        title: "Component Usage Example",
+        description: "Example of how components are structured in this project",
+        code: `import React from 'react';\n\nconst ExampleComponent = () => {\n  return (\n    <div className="component">\n      <h1>Hello World</h1>\n    </div>\n  );\n};\n\nexport default ExampleComponent;`,
+        explanation:
+          "This shows the basic structure of React components used in the project",
       },
     ],
+
+    mermaidDiagram: `flowchart TD
+    A[App Entry Point] --> B[Router]
+    B --> C[Pages]
+    B --> D[Components]
+    C --> E[UI Components]
+    D --> E
+    E --> F[User Interface]
+    G[Backend/API] --> H[Data Layer]
+    C --> G
+    D --> G`,
   };
-}
+};

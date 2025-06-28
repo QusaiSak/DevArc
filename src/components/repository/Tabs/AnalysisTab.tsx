@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -12,17 +12,22 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
-import type { AnalysisTabProps } from "@/types/repo.interface";
 
+interface AnalysisTabProps {
+  analysis: any;
+  analyzing: boolean;
+  onAnalyzeRepository: () => void;
+  onStoreAnalysis: () => void;
+  hasAnalysisData: boolean;
+}
 
-
-export const AnalysisTab: React.FC<AnalysisTabProps> = ({
+export const AnalysisTab = memo<AnalysisTabProps>(function AnalysisTab({
   analysis,
   analyzing,
-  onRunAnalysis,
+  onAnalyzeRepository,
   onStoreAnalysis,
-}) => {
-  const hasAnalysisData =
+}) {
+  const hasAnalysisDataCheck =
     analysis.structure ||
     analysis.codeAnalysis ||
     analysis.documentation ||
@@ -32,7 +37,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
         <Card className="bg-gradient-to-br from-background via-background to-accent/5 border-border/50 shadow-lg">
-          <CardHeader >
+          <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/10">
@@ -140,17 +145,19 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-3">
-                      {analysis.codeAnalysis.strengths.map((strength, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-3 p-4 bg-green-100/80 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors duration-200"
-                        >
-                          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-green-800 dark:text-green-200 leading-relaxed">
-                            {strength}
-                          </span>
-                        </div>
-                      ))}
+                      {analysis.codeAnalysis.strengths.map(
+                        (strength, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-3 p-4 bg-green-100/80 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors duration-200"
+                          >
+                            <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span className="text-green-800 dark:text-green-200 leading-relaxed">
+                              {strength}
+                            </span>
+                          </div>
+                        )
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -168,17 +175,19 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-3">
-                      {analysis.codeAnalysis.weaknesses.map((weakness, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-3 p-4 bg-red-100/80 dark:bg-red-900/20 rounded-lg border border-red-200/50 dark:border-red-800/50 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors duration-200"
-                        >
-                          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-red-800 dark:text-red-200 leading-relaxed">
-                            {weakness}
-                          </span>
-                        </div>
-                      ))}
+                      {analysis.codeAnalysis.weaknesses.map(
+                        (weakness, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-3 p-4 bg-red-100/80 dark:bg-red-900/20 rounded-lg border border-red-200/50 dark:border-red-800/50 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors duration-200"
+                          >
+                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                            <span className="text-red-800 dark:text-red-200 leading-relaxed">
+                              {weakness}
+                            </span>
+                          </div>
+                        )
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -196,17 +205,19 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-3">
-                      {analysis.codeAnalysis.recommendations.map((recommendation, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-3 p-4 bg-blue-100/80 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors duration-200"
-                        >
-                          <TrendingUp className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-blue-800 dark:text-blue-200 leading-relaxed">
-                            {recommendation}
-                          </span>
-                        </div>
-                      ))}
+                      {analysis.codeAnalysis.recommendations.map(
+                        (recommendation, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-3 p-4 bg-blue-100/80 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors duration-200"
+                          >
+                            <TrendingUp className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <span className="text-blue-800 dark:text-blue-200 leading-relaxed">
+                              {recommendation}
+                            </span>
+                          </div>
+                        )
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -234,12 +245,13 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
             Code Analysis Ready
           </h3>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto leading-relaxed">
-            Run comprehensive analysis to get detailed insights about code quality, structure, and maintainability metrics.
+            Run comprehensive analysis to get detailed insights about code
+            quality, structure, and maintainability metrics.
           </p>
 
           <div className="flex justify-center space-x-4">
             <Button
-              onClick={onRunAnalysis}
+              onClick={onAnalyzeRepository}
               disabled={analyzing}
               size="lg"
               className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200"
@@ -257,7 +269,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
               )}
             </Button>
 
-            {hasAnalysisData && (
+            {hasAnalysisDataCheck && (
               <Button
                 onClick={onStoreAnalysis}
                 variant="secondary"
@@ -273,4 +285,4 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
       </CardContent>
     </Card>
   );
-};
+});

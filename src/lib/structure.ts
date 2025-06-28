@@ -17,13 +17,64 @@ export class StructureAnalyzer {
     this.githubService = new GitHubService(githubToken);
   }
 
+  private cacheKey(owner: string, repo: string): string {
+    return `repo_structure_${owner}_${repo}`;
+  }
+
+  private getFromCache(key: string): ProjectStructure | null {
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Check if cache is less than 24 hours old
+        const cacheTime = new Date(parsed.cachedAt);
+        const now = new Date();
+        const hoursDiff =
+          (now.getTime() - cacheTime.getTime()) / (1000 * 60 * 60);
+
+        if (hoursDiff < 24) {
+          console.log(`Using cached structure for ${key}`);
+          return parsed.data;
+        } else {
+          localStorage.removeItem(key);
+          console.log(`Cache expired for ${key}`);
+        }
+      }
+    } catch (error) {
+      console.warn("Error reading from cache:", error);
+    }
+    return null;
+  }
+
+  private saveToCache(key: string, data: ProjectStructure): void {
+    try {
+      const cacheData = {
+        data,
+        cachedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(key, JSON.stringify(cacheData));
+      console.log(`Saved structure to cache for ${key}`);
+    } catch (error) {
+      console.warn("Error saving to cache:", error);
+    }
+  }
+
   async analyzeRepository(
     owner: string,
-    repo: string
+    repo: string,
+    forceRefresh: boolean = false
   ): Promise<ProjectStructure> {
     console.log(`Starting analysis of ${owner}/${repo}`);
 
     try {
+      // Check cache first unless forced refresh
+      if (!forceRefresh) {
+        const cached = this.getFromCache(this.cacheKey(owner, repo));
+        if (cached) {
+          return cached;
+        }
+      }
+
       // Get repository structure
       const files = await this.githubService.getRepositoryStructure(
         owner,
@@ -129,7 +180,12 @@ export class StructureAnalyzer {
       console.log(`Successfully parsed ${parsedFiles.length} files`);
 
       // Build project structure
-      return this.buildProjectStructure(parsedFiles, files);
+      const projectStructure = this.buildProjectStructure(parsedFiles, files);
+
+      // Save to cache
+      this.saveToCache(this.cacheKey(owner, repo), projectStructure);
+
+      return projectStructure;
     } catch (error) {
       console.error(`Error analyzing repository ${owner}/${repo}:`, error);
       throw error;

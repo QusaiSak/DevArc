@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ import type {
   RepositoryData,
 } from "@/types/repo.interface";
 
-export default function RepositoryDetailsPage() {
+const RepositoryDetailsPage = memo(function RepositoryDetailsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -283,11 +284,11 @@ export default function RepositoryDetailsPage() {
     setAnalyzing(true);
     try {
       const aiAnalyzer = new AIAnalyzer();
-      const codeAnalysis = await aiAnalyzer.analyzeCodeStructure(
+      const codeAnalysis: any = await aiAnalyzer.analyzeCodeStructure(
         parsedStructure
       );
 
-      setAnalysis((prev): any => ({ ...prev, codeAnalysis }));
+      setAnalysis((prev) => ({ ...prev, codeAnalysis }));
 
       // Save the analysis results for caching
       if (user?.id) {
@@ -324,21 +325,35 @@ export default function RepositoryDetailsPage() {
     try {
       const aiAnalyzer = new AIAnalyzer();
       const language = repository.language?.toLowerCase() || "javascript";
-      const documentation = await aiAnalyzer.generateComprehensiveDocumentation(
-        parsedStructure,
-        language,
-        repository.name
-      );
 
-      console.log("✅ Documentation generated:", documentation); // Add this line
+      // Get the response and ensure it's properly typed
+      const rawDocumentation =
+        await aiAnalyzer.generateComprehensiveDocumentation(
+          parsedStructure,
+          language,
+          repository.name
+        );
 
-      setAnalysis((prev): any => {
-        const updatedAnalysis = { ...prev, documentation };
-        console.log("✅ Analysis state updated:", updatedAnalysis); // Add this line
+      console.log("🔍 Raw documentation response:", rawDocumentation);
+
+      // Cast to the correct type
+      const documentation = rawDocumentation as ComprehensiveDocumentation;
+
+      console.log("✅ Typed documentation:", documentation);
+
+      setAnalysis((prev) => {
+        const updatedAnalysis = {
+          ...prev,
+          documentation,
+        };
+        console.log(
+          "✅ Analysis state updated with documentation:",
+          updatedAnalysis
+        );
         return updatedAnalysis;
       });
 
-      // Save the documentation for caching
+      // Save and show success message
       if (user?.id) {
         try {
           const projectId = `${owner}/${repo}`;
@@ -346,14 +361,17 @@ export default function RepositoryDetailsPage() {
             projectId,
             documentation: JSON.stringify(documentation),
           });
+          toast.success("Documentation generated and cached successfully!");
         } catch (saveError) {
           console.error("❌ Error saving analysis:", saveError);
-          toast.error("Error saving analysis.");
+          toast.error("Documentation generated but failed to cache.");
         }
+      } else {
+        toast.success("Documentation generated successfully!");
       }
     } catch (error) {
       console.error("❌ Documentation generation failed:", error);
-      toast.error("Documentation generation failed.");
+      toast.error("Documentation generation failed. Please try again.");
     } finally {
       setGeneratingDocs(false);
     }
@@ -709,4 +727,6 @@ ${
       </div>
     </ErrorBoundary>
   );
-}
+});
+
+export default RepositoryDetailsPage;

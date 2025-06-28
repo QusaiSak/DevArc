@@ -205,34 +205,35 @@ export function validateAndFixMermaidDiagram(diagram: string): string {
   return result;
 }
 
-export function parseAiJsonResponse(aiText: string): unknown {
+export function parseAiJsonResponse(aiText: string): any {
   try {
-    // Trim whitespace
     let sanitized = aiText.trim();
-
-    // Remove ```json or ``` wrapping if present
-    if (sanitized.startsWith("```json")) {
-      sanitized = sanitized.replace(/^```json/, "").trim();
+    
+    // Remove markdown blocks
+    sanitized = sanitized.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    // Find JSON object
+    const firstBrace = sanitized.indexOf('{');
+    const lastBrace = sanitized.lastIndexOf('}');
+    
+    if (firstBrace === -1 || lastBrace === -1) {
+      throw new Error("No JSON object found");
     }
-    if (sanitized.startsWith("```")) {
-      sanitized = sanitized.replace(/^```/, "").trim();
-    }
-    if (sanitized.endsWith("```")) {
-      sanitized = sanitized.slice(0, -3).trim();
-    }
-
-    // Optional: fix any escaped characters (not always needed, but safe)
+    
+    sanitized = sanitized.substring(firstBrace, lastBrace + 1);
+    
+    // Clean up problematic characters
     sanitized = sanitized
-      .replace(/\\"/g, '"') // Unescape quotes
-      .replace(/\\n/g, "") // Remove newline escapes
-      .replace(/\\r/g, "") // Remove carriage returns
-      .replace(/^"+|"+$/g, ""); // Trim surrounding quotes if present
-
-    // Parse final cleaned string
+      .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+      .replace(/,(\s*[}\]])/g, '$1')    // Remove trailing commas
+      .replace(/\\/g, '\\\\')           // Escape backslashes
+      .replace(/"/g, '"')               // Normalize quotes
+      .trim();
+    
     return JSON.parse(sanitized);
   } catch (err) {
-    console.error("❌ Failed to parse AI JSON response:", err);
-    console.log("🔎 Raw AI response was:\n", aiText);
-    throw new Error("Could not parse AI response as valid JSON.");
+    console.error("JSON parsing failed:", err);
+    console.log("Problematic text:", aiText.substring(0, 500));
+    throw new Error(`Could not parse AI response as valid JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
   }
 }
