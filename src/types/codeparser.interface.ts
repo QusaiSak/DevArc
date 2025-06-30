@@ -253,6 +253,7 @@ export interface ComprehensiveDocumentation {
     name: string;
     type: string;
     file: string;
+    description: string;
     properties: Array<{
       name: string;
       type: string;

@@ -1,4 +1,4 @@
-import React, { useMemo, memo } from "react";
+import { useMemo, memo } from "react";
 import {
   Card,
   CardContent,
@@ -26,14 +26,10 @@ import {
   FileX,
   Globe,
   Layers,
-  GitBranch,
   Workflow,
-  Play,
   Cpu,
   Database,
   Users,
-  BookmarkIcon,
-  Wrench,
 } from "lucide-react";
 import MermaidDiagram from "@/components/repository/helper/MermaidDiagram";
 import type { ComprehensiveDocumentation } from "@/types/codeparser.interface";

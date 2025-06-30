@@ -110,7 +110,7 @@ export const generateAiResponse = async (
 
 export class AIAnalyzer {
   async generateSDLCRecommendation(projectData: ProjectData) {
-    let prompt = PROMPTS.sdlcRecommendation(projectData);
+    let prompt: any = PROMPTS.sdlcRecommendation(projectData);
     let aiMessages: AiMessage[] = [];
     if (
       prompt &&
@@ -149,7 +149,7 @@ export class AIAnalyzer {
 
   async analyzeCodeStructure(structure: ProjectStructure) {
     // Sanitize and truncate prompt before sending to AI
-    let prompt = PROMPTS.codeStructure(structure);
+    let prompt: any = PROMPTS.codeStructure(structure);
     // If the prompt is an object, extract the messages array
     let aiMessages: AiMessage[] = [];
     if (
@@ -217,7 +217,7 @@ export class AIAnalyzer {
     }
 
     // Sanitize and truncate prompt before sending to AI
-    let prompt = PROMPTS.testCases(language, aggregatedContent);
+    let prompt: any = PROMPTS.testCases(language, aggregatedContent);
     let aiMessages: AiMessage[] = [];
     if (
       prompt &&

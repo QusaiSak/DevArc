@@ -62,7 +62,7 @@ export interface AnalysisResults {
 
 export interface TestCase {
   name: string;
-  testCase: string;
+  testCases: string;
   type: "unit" | "integration" | "e2e"; // Make this a literal type instead of string
   priority: "high" | "medium" | "low";
   framework: string; // Specify the testing framework used
