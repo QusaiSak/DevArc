@@ -1,3 +1,20 @@
+export interface PackageJsonMetadata {
+  type: "package-json";
+  name: string;
+  version: string;
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+}
+
+export interface PackageLockJsonMetadata {
+  type: "package-lock";
+  name: string;
+  version: string;
+  lockfileVersion: number;
+}
+
+export type FileMetadata = PackageJsonMetadata | PackageLockJsonMetadata | null;
+
 export interface ParsedFile {
   path: string;
   content: string;
@@ -22,6 +39,7 @@ export interface ParsedFile {
   }>;
   language: string;
   size: number;
+  metadata?: FileMetadata;
 }
 
 export interface CodeStructure {
@@ -194,7 +212,7 @@ export interface ComprehensiveDocumentation {
     };
   }>;
   apis: Array<{
-    endpoint: string;
+    path: string;
     method: string;
     description: string;
     parameters: Array<{

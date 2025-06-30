@@ -11,6 +11,44 @@ import { Progress } from "@/components/ui/progress";
 import { TestTube, Download, Loader2, Copy, FileCode } from "lucide-react";
 import type { TestCasesTabProps } from "@/types/repo.interface";
 
+const formatCode = (code: string | undefined): string => {
+  if (!code || typeof code !== "string") return "";
+  return code;
+};
+
+const copyToClipboard = async (code: string) => {
+  try {
+    await navigator.clipboard.writeText(code);
+  } catch (err) {
+    console.error("Failed to copy code:", err);
+  }
+};
+
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case "high":
+      return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800";
+    case "medium":
+      return "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800";
+    case "low":
+      return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800";
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800";
+  }
+};
+
+const getTypeColor = (type: string) => {
+  switch (type.toLowerCase()) {
+    case "unit":
+      return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800";
+    case "integration":
+      return "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800";
+    case "e2e":
+      return "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800";
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800";
+  }
+};
 
 export const TestCasesTab: React.FC<TestCasesTabProps> = ({
   testCases,
@@ -19,99 +57,6 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
   onStoreAnalysis,
   hasAnalysisData,
 }) => {
-  const copyToClipboard = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-    } catch (err) {
-      console.error("Failed to copy code:", err);
-    }
-  };
-
-  // Function to format and beautify JavaScript/TypeScript code
-  const formatCode = (code: string): string => {
-    if (!code) return "";
-
-    const formatted = code
-      // Remove extra spaces and normalize
-      .replace(/\s+/g, " ")
-      .trim()
-
-      // Add line breaks after common patterns
-      .replace(/\{/g, " {\n  ")
-      .replace(/\}/g, "\n}")
-      .replace(/;/g, ";\n  ")
-      .replace(/,/g, ",\n  ")
-
-      // Fix specific test patterns
-      .replace(/describe\(/g, "\ndescribe(")
-      .replace(/it\(/g, "\n  it(")
-      .replace(/expect\(/g, "\n    expect(")
-      .replace(/await /g, "\n    await ")
-      .replace(/const /g, "\n    const ")
-      .replace(/\)\s*=>/g, ") =>")
-
-      // Clean up extra newlines and spaces
-      .replace(/\n\s*\n/g, "\n")
-      .replace(/\n\s+\n/g, "\n")
-      .replace(/^\s+/gm, (match) => match)
-
-      // Fix indentation
-      .split("\n")
-      .map((line, index) => {
-        const trimmed = line.trim();
-        if (!trimmed) return "";
-        let indent = "";
-        if (trimmed.startsWith("describe(")) {
-          indent = "";
-        } else if (trimmed.startsWith("it(")) {
-          indent = "  ";
-        } else if (trimmed.startsWith("}")) {
-          indent = index === 0 ? "" : "  ";
-        } else if (
-          trimmed.includes("expect(") ||
-          trimmed.includes("await ") ||
-          trimmed.includes("const ")
-        ) {
-          indent = "    ";
-        } else {
-          indent = "  ";
-        }
-
-        return indent + trimmed;
-      })
-      .filter((line) => line.length > 0)
-      .join("\n");
-
-    return formatted;
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800";
-      case "medium":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800";
-      case "low":
-        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800";
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "unit":
-        return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800";
-      case "integration":
-        return "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800";
-      case "e2e":
-        return "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800";
-    }
-  };
-
-  // This is the view when test cases have been generated
   if (testCases) {
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
@@ -165,10 +110,10 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
                 className="h-3 bg-secondary/30"
               />
             </div>
-
             <div className="space-y-6">
-              {testCases.testCases?.length > 0 ? (
-                testCases.testCases.map((testCase, index) => (
+              {Array.isArray(testCases.testCases) &&
+              testCases.testCases.length > 0 ? (
+                testCases.testCases.map((testCase: any, index: number) => (
                   <Card
                     key={index}
                     className="border-border/30 bg-gradient-to-br from-muted/20 to-muted/30 hover:from-muted/30 hover:to-muted/40 transition-all duration-300 shadow-sm hover:shadow-md"
@@ -210,7 +155,13 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
                           </span>
                           <Button
                             onClick={() =>
-                              copyToClipboard(formatCode(testCase.code))
+                              copyToClipboard(
+                                formatCode(
+                                  typeof testCase.code === "string"
+                                    ? testCase.code
+                                    : ""
+                                )
+                              )
                             }
                             size="sm"
                             variant="ghost"
@@ -221,7 +172,12 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
                         </div>
                         <div className="bg-slate-900 rounded-lg border border-border/30 p-5 font-mono text-sm leading-relaxed overflow-x-auto shadow-inner">
                           <pre className="text-slate-100 whitespace-pre-wrap break-words">
-                            {formatCode(testCase.code)}
+                            {typeof testCase.code === "string"
+                              ? testCase.code
+                                  .replace(/\\n/g, "\n")
+                                  .replace(/\\/g, "\\")
+                                  .trim()
+                              : ""}
                           </pre>
                         </div>
                       </div>
@@ -248,7 +204,7 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
     );
   }
 
-  // This is the initial empty state before generation
+  // Initial empty state before generation
   return (
     <Card className="bg-gradient-to-br from-background via-background to-accent/5 border-border/50 shadow-lg">
       <CardContent className="pt-6">
@@ -261,7 +217,6 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
               <TestTube className="h-10 w-10 text-primary" />
             </div>
           </div>
-
           <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
             Generate Test Cases
           </h3>
@@ -269,7 +224,6 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
             Use AI to generate comprehensive test cases for this repository,
             including unit tests, integration tests, and end-to-end scenarios.
           </p>
-
           <div className="flex justify-center space-x-4">
             <Button
               onClick={onGenerateTestCases}
@@ -289,7 +243,6 @@ export const TestCasesTab: React.FC<TestCasesTabProps> = ({
                 </>
               )}
             </Button>
-
             {hasAnalysisData && (
               <Button
                 onClick={onStoreAnalysis}

@@ -1,8 +1,347 @@
-import type { ParsedFile } from "@/types/codeparser.interface";
+import type {
+  ParsedFile,
+  PackageJsonMetadata,
+  PackageLockJsonMetadata,
+} from "@/types/codeparser.interface";
+
+interface PackageJson {
+  name?: string;
+  version?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+}
+
+interface PackageLockJson {
+  name?: string;
+  version?: string;
+  dependencies?: Record<
+    string,
+    {
+      version: string;
+      resolved?: string;
+      integrity?: string;
+      requires?: Record<string, string>;
+      dependencies?: Record<string, any>;
+    }
+  >;
+  packages?: Record<
+    string,
+    {
+      version?: string;
+      resolved?: string;
+      integrity?: string;
+      dependencies?: Record<string, string>;
+      dev?: boolean;
+      optional?: boolean;
+    }
+  >;
+}
+
+interface VulnerabilityInfo {
+  package: string;
+  version: string;
+  severity: "low" | "moderate" | "high" | "critical";
+  title: string;
+  url: string;
+  vulnerable_versions: string;
+  patched_versions: string;
+}
 
 export class CodeParser {
+  // --- CACHE MANAGEMENT ---
+  private static _cache: Record<string, any> = {};
+
+  /**
+   * Clear the parser cache (in-memory only)
+   */
+  static clearParserCache() {
+    this._cache = {};
+  }
+
+  /**
+   * Re-parse the codebase: clears cache and re-parses repository structure
+   * @param files The files array to parse
+   * @param language The language string (optional)
+   */
+  static async reparseCodebase(files: any[], language: string = "javascript") {
+    this.clearParserCache();
+    return await this.prototype.parseRepositoryStructure.call(new CodeParser(), files, language);
+  }
+
+  /**
+   * Parse package.json file and extract dependency information
+   */
+  parsePackageJson(content: string): PackageJson | null {
+    try {
+      return JSON.parse(content) as PackageJson;
+    } catch (error) {
+      console.error("Failed to parse package.json:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse package-lock.json file and extract dependency information
+   */
+  parsePackageLockJson(content: string): PackageLockJson | null {
+    try {
+      return JSON.parse(content) as PackageLockJson;
+    } catch (error) {
+      console.error("Failed to parse package-lock.json:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Check for known vulnerabilities in dependencies
+   * This is a simplified version - in a real app, you would use a service like npm audit or Snyk
+   */
+  async checkForVulnerabilities(
+    pkg: PackageJson,
+    pkgLock: PackageLockJson | null
+  ): Promise<VulnerabilityInfo[]> {
+    const vulnerabilities: VulnerabilityInfo[] = [];
+    const allDeps = {
+      ...(pkg.dependencies || {}),
+      ...(pkg.devDependencies || {}),
+    };
+
+    // In a real implementation, you would call an external service like:
+    // 1. npm audit
+    // 2. Snyk API
+    // 3. OSS Index
+    // For now, we'll return an empty array as a placeholder
+
+    // Example of how you might implement this with a real service:
+    /*
+    try {
+      const response = await fetch('https://api.snyk.io/v1/vuln/npm/package', {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${process.env.SNYK_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          package: pkg.name,
+          version: pkg.version,
+          dependencies: allDeps
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.vulnerabilities || [];
+      }
+    } catch (error) {
+      console.error('Error checking for vulnerabilities:', error);
+    }
+    */
+
+    return vulnerabilities;
+  }
+
+  /**
+   * Get a summary of dependencies and their versions
+   */
+  getDependencySummary(
+    pkg: PackageJson,
+    pkgLock: PackageLockJson | null
+  ): {
+    directDependencies: { name: string; version: string }[];
+    allDependencies: { name: string; version: string }[];
+  } {
+    const directDependencies = Object.entries({
+      ...(pkg.dependencies || {}),
+      ...(pkg.devDependencies || {}),
+    }).map(([name, version]) => ({
+      name,
+      version: this.cleanVersion(version),
+    }));
+
+    // Get all dependencies from package-lock if available
+    let allDependencies: { name: string; version: string }[] = [];
+
+    if (pkgLock) {
+      if (pkgLock.packages) {
+        // package-lock v2+ format
+        allDependencies = Object.entries(pkgLock.packages)
+          .filter(([key]) => key && !key.startsWith("node_modules/"))
+          .map(([key, pkg]) => ({
+            name: key.replace(/^node_modules\//, ""),
+            version: pkg.version || "unknown",
+          }));
+      } else if (pkgLock.dependencies) {
+        // package-lock v1 format
+        allDependencies = Object.entries(pkgLock.dependencies).map(
+          ([name, dep]) => ({
+            name,
+            version: dep.version,
+          })
+        );
+      }
+    }
+
+    return {
+      directDependencies,
+      allDependencies:
+        allDependencies.length > 0 ? allDependencies : directDependencies,
+    };
+  }
+
+  /**
+   * Clean version string (remove ^, ~, >, <, etc.)
+   */
+  private cleanVersion(version: string): string {
+    if (!version) return "unknown";
+    // Remove version range specifiers
+    return version.replace(/^[~^>=<]+/, "");
+  }
+
+  /**
+   * Generate a security report for the project's dependencies
+   */
+  async generateSecurityReport(
+    pkg: PackageJson,
+    pkgLock: PackageLockJson | null
+  ): Promise<{
+    summary: {
+      totalDependencies: number;
+      directDependencies: number;
+      outdatedPackages: number;
+      vulnerabilities: number;
+    };
+    vulnerabilities: VulnerabilityInfo[];
+    outdatedPackages: Array<{
+      name: string;
+      current: string;
+      latest: string;
+    }>;
+  }> {
+    const { directDependencies, allDependencies } = this.getDependencySummary(
+      pkg,
+      pkgLock
+    );
+    const vulnerabilities = await this.checkForVulnerabilities(pkg, pkgLock);
+
+    // In a real implementation, you would check for outdated packages
+    // by comparing current versions with latest versions from npm registry
+    const outdatedPackages: Array<{
+      name: string;
+      current: string;
+      latest: string;
+    }> = [];
+
+    // This is a placeholder - in a real implementation, you would:
+    // 1. Call npm outdated --json
+    // 2. Or call the npm registry API to get latest versions
+
+    return {
+      summary: {
+        totalDependencies: allDependencies.length,
+        directDependencies: directDependencies.length,
+        outdatedPackages: outdatedPackages.length,
+        vulnerabilities: vulnerabilities.length,
+      },
+      vulnerabilities,
+      outdatedPackages,
+    };
+  }
+
   // Keep this method - it's used by StructureAnalyzer
   parseFile(filePath: string, content: string): ParsedFile {
+    // Handle package.json files
+    if (filePath.endsWith("package.json")) {
+      try {
+        const pkg = this.parsePackageJson(content);
+        if (!pkg) {
+          throw new Error("Failed to parse package.json");
+        }
+
+        const metadata: PackageJsonMetadata = {
+          type: "package-json",
+          name: pkg.name || "unknown",
+          version: pkg.version || "0.0.0",
+          dependencies: pkg.dependencies || {},
+          devDependencies: pkg.devDependencies || {},
+        };
+
+        return {
+          path: filePath,
+          content: JSON.stringify(metadata, null, 2),
+          lines: content.split("\n").length,
+          complexity: 0,
+          functions: [],
+          imports: [],
+          exports: [],
+          language: "json",
+          size: content.length,
+          metadata,
+        };
+      } catch (error) {
+        console.error(`Error parsing package.json ${filePath}:`, error);
+        // Return a basic parsed file with error
+        return {
+          path: filePath,
+          content: "",
+          lines: 0,
+          complexity: 0,
+          functions: [],
+          imports: [],
+          exports: [],
+          language: "json",
+          size: content.length,
+          metadata: null,
+        };
+      }
+    }
+
+    // Handle package-lock.json files
+    if (filePath.endsWith("package-lock.json")) {
+      try {
+        const pkgLock = this.parsePackageLockJson(content);
+        if (!pkgLock) {
+          throw new Error("Failed to parse package-lock.json");
+        }
+
+        const metadata: PackageLockJsonMetadata = {
+          type: "package-lock",
+          name: pkgLock.name || "unknown",
+          version: pkgLock.version || "0.0.0",
+          lockfileVersion: (pkgLock as any)?.lockfileVersion || 1,
+        };
+
+        return {
+          path: filePath,
+          content: JSON.stringify(metadata, null, 2),
+          lines: content.split("\n").length,
+          complexity: 0,
+          functions: [],
+          imports: [],
+          exports: [],
+          language: "json",
+          size: content.length,
+          metadata,
+        };
+      } catch (error) {
+        console.error(`Error parsing package-lock.json ${filePath}:`, error);
+        // Return a basic parsed file with error
+        return {
+          path: filePath,
+          content: "",
+          lines: 0,
+          complexity: 0,
+          functions: [],
+          imports: [],
+          exports: [],
+          language: "json",
+          size: content.length,
+          metadata: null,
+        };
+      }
+    }
+
     // Handle binary files and very large files
     if (this.isBinaryFile(filePath) || content.length > 5000000) {
       // 5MB limit
@@ -872,6 +1211,8 @@ export class CodeParser {
       line: number;
     }> = [];
 
+    if (!content) return [];
+
     // Default exports: export default ...
     const defaultExports =
       /export\s+default\s+(?:class\s+(\w+)|function\s+(\w+)|(\w+))/g;
@@ -916,84 +1257,106 @@ export class CodeParser {
     return exports;
   }
 
+  private languageMap: Record<string, string> = {
+    // JavaScript/TypeScript
+    js: "javascript",
+    jsx: "javascript",
+    mjs: "javascript",
+    ts: "typescript",
+    tsx: "typescript",
+    // Python
+    py: "python",
+    pyc: "python",
+    pyo: "python",
+    pyd: "python",
+    pyx: "python",
+    pyi: "python",
+    // Java
+    java: "java",
+    class: "java",
+    jar: "java",
+    // C#
+    cs: "csharp",
+    csx: "csharp",
+    // C/C++
+    cpp: "cpp",
+    cxx: "cpp",
+    cc: "cpp",
+    c: "c",
+    h: "c",
+    // Go
+    go: "go",
+    // Ruby
+    rb: "ruby",
+    rbw: "ruby",
+    // PHP
+    php: "php",
+    phtml: "php",
+    php3: "php",
+    php4: "php",
+    php5: "php",
+    php7: "php",
+    // Rust
+    rs: "rust",
+    // Swift
+    swift: "swift",
+    // Kotlin
+    kt: "kotlin",
+    kts: "kotlin",
+    // Scala
+    scala: "scala",
+    sc: "scala",
+    // JSON
+    json: "json",
+    // HTML/CSS
+    html: "html",
+    htm: "html",
+    css: "css",
+    scss: "scss",
+    sass: "sass",
+    less: "less",
+    // XML
+    xml: "xml",
+    // Config files
+    yaml: "yaml",
+    yml: "yaml",
+    toml: "toml",
+    ini: "ini",
+    env: "env",
+    // Shell scripts
+    sh: "shell",
+    bash: "shell",
+    zsh: "shell",
+    fish: "shell",
+    // Markdown
+    md: "markdown",
+    markdown: "markdown",
+    // SQL
+    sql: "sql",
+    // R
+    r: "r",
+    // Perl
+    pl: "perl",
+    pm: "perl",
+    // Lua
+    lua: "lua",
+    // Dart
+    dart: "dart",
+    // Frontend frameworks
+    vue: "vue",
+    svelte: "svelte",
+    // Docker
+    dockerfile: "dockerfile",
+    Dockerfile: "dockerfile",
+    // Git
+    gitignore: "gitignore",
+    gitattributes: "gitattributes",
+    gitmodules: "gitmodules",
+  };
+
   private detectLanguage(filePath: string): string {
-    const extension = filePath.split(".").pop()?.toLowerCase();
-    const fileName = filePath.split("/").pop()?.toLowerCase() || "";
-
-    // Special handling for backend files
-    if (
-      fileName.includes("server") ||
-      fileName.includes("backend") ||
-      fileName.includes("api") ||
-      fileName.includes("routes") ||
-      filePath.toLowerCase().includes("/server/") ||
-      filePath.toLowerCase().includes("/backend/") ||
-      filePath.toLowerCase().includes("/api/")
-    ) {
-      if (extension === "js" || extension === "mjs")
-        return "backend_javascript";
-      if (extension === "ts") return "backend_typescript";
-      if (extension === "py") return "backend_python";
-      if (extension === "java") return "backend_java";
-      if (extension === "cs") return "backend_csharp";
-      if (extension === "php") return "backend_php";
-      if (extension === "rb") return "backend_ruby";
-      if (extension === "go") return "backend_go";
-    }
-
-    const languageMap: Record<string, string> = {
-      js: "javascript",
-      jsx: "javascript",
-      mjs: "javascript",
-      ts: "typescript",
-      tsx: "typescript",
-      py: "python",
-      pyx: "python",
-      pyi: "python",
-      java: "java",
-      cpp: "cpp",
-      cxx: "cpp",
-      cc: "cpp",
-      c: "c",
-      h: "c",
-      cs: "csharp",
-      php: "php",
-      rb: "ruby",
-      go: "go",
-      rs: "rust",
-      swift: "swift",
-      kt: "kotlin",
-      kts: "kotlin",
-      scala: "scala",
-      sc: "scala",
-      html: "html",
-      htm: "html",
-      css: "css",
-      scss: "scss",
-      sass: "sass",
-      less: "less",
-      json: "json",
-      xml: "xml",
-      yaml: "yaml",
-      yml: "yaml",
-      md: "markdown",
-      markdown: "markdown",
-      sh: "shell",
-      bash: "shell",
-      zsh: "shell",
-      fish: "shell",
-      sql: "sql",
-      r: "r",
-      R: "r",
-      pl: "perl",
-      pm: "perl",
-      lua: "lua",
-      dart: "dart",
-      vue: "vue",
-      svelte: "svelte",
-    };
-
-    return languageMap[extension || ""] || "text";
+    const extension = filePath.split(".").pop()?.toLowerCase() || "";
+    return this.languageMap[extension] || extension;
   }
 
   private detectLanguageFromContent(content: string): string {
@@ -1140,6 +1503,7 @@ export async function parseRepositoryStructure(
   const structure: any = {
     totalFiles: 0,
     totalLines: 0,
+    language: language, // Track the primary language used for analysis
     complexity: { average: 0, max: 0, files: [] },
     patterns: {
       framework: [],
@@ -1158,6 +1522,40 @@ export async function parseRepositoryStructure(
   if (!files || files.length === 0) {
     return structure;
   }
+
+  // Define language-specific file extensions
+  const languageExtensions: Record<string, string[]> = {
+    javascript: [".js", ".jsx", ".mjs", ".cjs"],
+    typescript: [".ts", ".tsx", ".mts", ".cts"],
+    python: [".py", ".pyc", ".pyo", ".pyd", ".pyx", ".pyi"],
+    java: [".java", ".class", ".jar"],
+    csharp: [".cs", ".csx"],
+    cpp: [".cpp", ".cxx", ".cc", ".c", ".h", ".hpp", ".hxx"],
+    go: [".go"],
+    ruby: [".rb", ".rbw"],
+    php: [".php", ".phtml", ".php3", ".php4", ".php5", ".php7"],
+    rust: [".rs"],
+    swift: [".swift"],
+    kotlin: [".kt", ".kts"],
+    scala: [".scala", ".sc"],
+    html: [".html", ".htm"],
+    css: [".css"],
+    scss: [".scss"],
+    sass: [".sass"],
+    less: [".less"],
+    json: [".json"],
+    yaml: [".yaml", ".yml"],
+    markdown: [".md", ".markdown"],
+    sql: [".sql"],
+    shell: [".sh", ".bash", ".zsh", ".fish"],
+    dockerfile: [".dockerfile", "Dockerfile"],
+  };
+
+  // Get extensions for the specified language, or allow all if language is not specified
+  const targetExtensions =
+    language && languageExtensions[language.toLowerCase()]
+      ? languageExtensions[language.toLowerCase()]
+      : [];
 
   // Filter valid files - include more file types and backend files
   const validFiles = files.filter((file) => {
@@ -1186,6 +1584,14 @@ export async function parseRepositoryStructure(
     );
 
     if (isExcluded) return false;
+
+    // If a specific language is specified, only include files with matching extensions
+    if (targetExtensions.length > 0) {
+      const fileExtension = file.path
+        .substring(file.path.lastIndexOf("."))
+        .toLowerCase();
+      return targetExtensions.includes(fileExtension);
+    }
 
     // Include more file extensions for better backend support
     const validExtensions = [

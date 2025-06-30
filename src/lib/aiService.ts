@@ -14,12 +14,16 @@ import {
   createFolderStructureTree,
   extractApiEndpoints,
 } from "../helper/fallback";
-import { isCodeFile, parseAiJsonResponse } from "@/helper/utils";
+import {
+  isCodeFile,
+  parseAiJsonResponse,
+  parseAiJsonResponseTest,
+} from "@/helper/utils";
 
 const DEFAULT_OPTIONS: AiResponseOptions = {
   model: "mistralai/devstral-small:free",
   systemPrompt: PROMPTS.system,
-  temperature: 0.5,
+  temperature: 0.2,
   maxTokens: 8192,
 };
 
@@ -106,11 +110,36 @@ export const generateAiResponse = async (
 
 export class AIAnalyzer {
   async generateSDLCRecommendation(projectData: ProjectData) {
-    const prompt = PROMPTS.sdlcRecommendation(projectData);
+    let prompt = PROMPTS.sdlcRecommendation(projectData);
+    let aiMessages: AiMessage[] = [];
+    if (
+      prompt &&
+      typeof prompt === "object" &&
+      Array.isArray(prompt.messages)
+    ) {
+      aiMessages = prompt.messages.map((m: any) => ({
+        ...m,
+        content:
+          typeof m.content === "string"
+            ? m.content.slice(0, 6000) // truncate to 6k chars for safety
+            : "",
+      }));
+    } else {
+      aiMessages = [
+        {
+          role: "user",
+          content: typeof prompt === "string" ? prompt.slice(0, 6000) : "",
+        },
+      ];
+    }
+    // Final fallback to avoid empty prompt
+    if (!aiMessages.length) {
+      aiMessages = [
+        { role: "user", content: "Analyze the provided code structure." },
+      ];
+    }
     try {
-      const response = await generateAiResponse([
-        { role: "user", content: prompt },
-      ]);
+      const response = await generateAiResponse(aiMessages);
       return parseAiJsonResponse(response);
     } catch (error) {
       console.error("AI SDLC analysis failed:", error);
@@ -119,11 +148,38 @@ export class AIAnalyzer {
   }
 
   async analyzeCodeStructure(structure: ProjectStructure) {
-    const prompt = PROMPTS.codeStructure(structure);
+    // Sanitize and truncate prompt before sending to AI
+    let prompt = PROMPTS.codeStructure(structure);
+    // If the prompt is an object, extract the messages array
+    let aiMessages: AiMessage[] = [];
+    if (
+      prompt &&
+      typeof prompt === "object" &&
+      Array.isArray(prompt.messages)
+    ) {
+      aiMessages = prompt.messages.map((m: any) => ({
+        ...m,
+        content:
+          typeof m.content === "string"
+            ? m.content.slice(0, 6000) // truncate to 6k chars for safety
+            : "",
+      }));
+    } else {
+      aiMessages = [
+        {
+          role: "user",
+          content: typeof prompt === "string" ? prompt.slice(0, 6000) : "",
+        },
+      ];
+    }
+    // Final fallback to avoid empty prompt
+    if (!aiMessages.length) {
+      aiMessages = [
+        { role: "user", content: "Analyze the provided code structure." },
+      ];
+    }
     try {
-      const response = await generateAiResponse([
-        { role: "user", content: prompt },
-      ]);
+      const response = await generateAiResponse(aiMessages);
       return parseAiJsonResponse(response);
     } catch (error) {
       console.error("AI structure analysis failed:", error);
@@ -160,14 +216,42 @@ export class AIAnalyzer {
       aggregatedContent += `\n=== FILE: ${file.path} ===\n\n${file.content}\n\n=== END FILE ===\n`;
     }
 
-    const prompt = PROMPTS.testCases(language, aggregatedContent);
-
+    // Sanitize and truncate prompt before sending to AI
+    let prompt = PROMPTS.testCases(language, aggregatedContent);
+    let aiMessages: AiMessage[] = [];
+    if (
+      prompt &&
+      typeof prompt === "object" &&
+      Array.isArray(prompt.messages)
+    ) {
+      aiMessages = prompt.messages.map((m: any) => ({
+        ...m,
+        content:
+          typeof m.content === "string"
+            ? m.content.slice(0, 6000) // truncate to 6k chars for safety
+            : "",
+      }));
+    } else {
+      aiMessages = [
+        {
+          role: "user",
+          content: typeof prompt === "string" ? prompt.slice(0, 6000) : "",
+        },
+      ];
+    }
+    if (!aiMessages.length) {
+      aiMessages = [
+        {
+          role: "user",
+          content: "Generate comprehensive test cases for the provided code.",
+        },
+      ];
+    }
     try {
-      const response = await generateAiResponse(
-        [{ role: "user", content: prompt }],
-        { maxTokens: 4096 }
-      );
-      return parseAiJsonResponse(response);
+      const response = await generateAiResponse(aiMessages, {
+        maxTokens: 4096,
+      });
+      return parseAiJsonResponseTest(response);
     } catch (error) {
       console.error("AI test generation from structure failed:", error);
       return fallbackTestGenerationFromStructure(language, repositoryName);
@@ -224,7 +308,7 @@ export class AIAnalyzer {
     // Extract API endpoints using the utility function
     const apiEndpoints: any = extractApiEndpoints(validFiles);
 
-    const prompt = PROMPTS.comprehensiveDocumentationFromFiles(
+    const { messages } = PROMPTS.comprehensiveDocumentationFromFiles(
       selectedFiles,
       language,
       repositoryName,
@@ -232,78 +316,23 @@ export class AIAnalyzer {
       apiEndpoints
     );
 
+    console.log("📝 API endpoints being passed:", apiEndpoints?.length || 0);
+    console.log("📝 Folder tree being passed:", folderTree ? "✅" : "❌");
+
     console.log("📝 Sending prompt to AI...");
 
     try {
       const response = await generateAiResponse(
-        [{ role: "user", content: prompt }],
-        {
-          maxTokens: 6144, // Reduced token limit
-          temperature: 0.3, // Lower temperature for more consistent JSON
-        }
+        messages.map((m) => ({ ...m, role: "user" as const }))
       );
 
-      console.log("🔍 Raw AI response type:", typeof response);
       console.log("🔍 Raw AI response length:", response.length);
       console.log("🔍 Raw AI response preview:", response.substring(0, 300));
 
-      // Enhanced JSON parsing with multiple fallback strategies
-      let result;
-      try {
-        result = parseAiJsonResponse(response);
-      } catch (parseError) {
-        console.warn(
-          "⚠️ Initial JSON parsing failed, trying alternative strategies..."
-        );
+      // Directly use the new, more robust parser.
+      // It will throw an error if it fails, which will be caught below.
+      const result = parseAiJsonResponse(response);
 
-        // Strategy 1: Try to extract JSON from response
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            result = JSON.parse(jsonMatch[0]);
-            console.log("✅ Successfully extracted JSON using regex");
-          } catch (regexError) {
-            console.warn("❌ Regex JSON extraction failed");
-          }
-        }
-
-        // Strategy 2: Try to clean and parse
-        if (!result) {
-          try {
-            let cleaned = response
-              .replace(/```json/g, "")
-              .replace(/```/g, "")
-              .replace(/^\s*[\r\n]/gm, "")
-              .trim();
-
-            // Find first { and last }
-            const firstBrace = cleaned.indexOf("{");
-            const lastBrace = cleaned.lastIndexOf("}");
-
-            if (
-              firstBrace !== -1 &&
-              lastBrace !== -1 &&
-              lastBrace > firstBrace
-            ) {
-              cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-              result = JSON.parse(cleaned);
-              console.log("✅ Successfully parsed cleaned JSON");
-            }
-          } catch (cleanError) {
-            console.warn("❌ Cleaned JSON parsing failed");
-          }
-        }
-
-        // If all parsing strategies fail, use fallback
-        if (!result) {
-          console.error(
-            "❌ All JSON parsing strategies failed, using fallback"
-          );
-          throw parseError;
-        }
-      }
-
-      console.log("✅ Parsed documentation type:", typeof result);
       console.log("✅ Parsed documentation keys:", Object.keys(result || {}));
 
       // Validate and enhance the result structure

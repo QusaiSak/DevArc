@@ -62,15 +62,18 @@ export interface AnalysisResults {
 
 export interface TestCase {
   name: string;
+  testCase: string;
   type: "unit" | "integration" | "e2e"; // Make this a literal type instead of string
   priority: "high" | "medium" | "low";
+  framework: string; // Specify the testing framework used
+  coverage: number; // Percentage of code covered by this test case
   description: string;
   code: string;
   file?: string; // Add this if your test cases include file references
 }
 
 export interface TestCasesTabProps {
-  testCases?: unknown;
+  testCases?: TestCase;
   generatingTests: boolean;
   onGenerateTestCases: () => void;
   onStoreAnalysis: () => void;

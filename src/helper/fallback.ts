@@ -10,77 +10,64 @@ export function createFolderStructureTree(
     return `${repositoryName}/\n└── (empty)`;
   }
 
-  // Build directory tree structure
+  // Create tree structure
   const tree: Record<string, any> = {};
 
-  // Filter and process files
-  const validFiles = files.filter((f) => f.path && f.path.trim().length > 0);
-
-  validFiles.forEach((file) => {
-    // Handle both forward and backward slashes, and normalize paths
-    const normalizedPath = file.path
-      .replace(/\\/g, "/")
-      .replace(/^\/+|\/+$/g, "");
-    if (!normalizedPath) return;
-
-    const parts = normalizedPath.split("/").filter((part) => part.length > 0);
-    if (parts.length === 0) return;
-
+  // Process all files
+  files.forEach((file) => {
+    const parts = file.path.split(/[/\\]/).filter(Boolean);
     let current = tree;
 
-    // Navigate through directory structure
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i];
-      if (!current[part]) {
-        current[part] = {};
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) {
+        // It's a file
+        current[part] = null;
+      } else {
+        // It's a directory
+        current[part] = current[part] || {};
+        current = current[part];
       }
-      current = current[part];
-    }
-
-    // Add file to the directory
-    const fileName = parts[parts.length - 1];
-    if (fileName && fileName.trim().length > 0) {
-      current[fileName] = null; // null indicates it's a file
-    }
+    });
   });
 
-  // Function to render tree with proper indentation
+  // Generate the tree string
   function renderTree(
-    node: any,
-    prefix: string = "",
-    isLast: boolean = true
-  ): string {
-    let result = "";
-    const entries = Object.keys(node).sort((a, b) => {
-      // Directories first, then files
-      const aIsDir = node[a] !== null;
-      const bIsDir = node[b] !== null;
-      if (aIsDir && !bIsDir) return -1;
-      if (!aIsDir && bIsDir) return 1;
-      return a.localeCompare(b);
-    });
+    node: Record<string, any>,
+    prefix = "",
+    isLast = true,
+    isRoot = false
+  ): string[] {
+    const entries = Object.entries(node);
+    const lines: string[] = [];
 
-    entries.forEach((key, index) => {
+    entries.forEach(([key, value], index) => {
       const isLastEntry = index === entries.length - 1;
-      const isDirectory = node[key] !== null;
-      const connector = isLastEntry ? "└── " : "├── ";
-      const name = isDirectory ? `${key}/` : key;
+      const newPrefix = isRoot ? "" : prefix + (isLast ? "    " : "│   ");
+      
+      // Add current line
+      lines.push(
+        `${prefix}${isRoot ? "" : isLast ? "└── " : "├── "}${key}${
+          value === null ? "" : "/"
+        }`
+      );
 
-      result += `${prefix}${connector}${name}\n`;
-
-      if (isDirectory && Object.keys(node[key]).length > 0) {
-        const newPrefix = prefix + (isLastEntry ? "    " : "│   ");
-        result += renderTree(node[key], newPrefix, isLastEntry);
+      // Recursively process children
+      if (value !== null) {
+        lines.push(
+          ...renderTree(value, newPrefix, isLastEntry)
+        );
       }
     });
 
-    return result;
+    return lines;
   }
 
-  return `${repositoryName}/\n${renderTree(tree)}`.trim();
+  const treeLines = renderTree(tree, "", true, true);
+  return `${repositoryName}/\n${treeLines.join("\n")}`;
 }
 
-// Function to extract API endpoints from files
+// Update the API endpoint extraction to return better structured data:
+
 export function extractApiEndpoints(
   files: Array<{ path: string; content: string }>
 ): Array<{
@@ -114,114 +101,150 @@ export function extractApiEndpoints(
       (file.content.includes("def ") && file.content.includes("request"));
 
     if (isApiFile) {
-      // Extract Express.js/Node.js routes
-      const routeMatches = file.content.match(
-        /router\.(get|post|put|delete|patch)\s*\(\s*["'`]([^"'`]+)["'`]/g
-      );
-      const appMatches = file.content.match(
-        /app\.(get|post|put|delete|patch)\s*\(\s*["'`]([^"'`]+)["'`]/g
-      );
-
-      // Extract Flask routes
-      const flaskMatches = file.content.match(
-        /@app\.route\s*\(\s*["'`]([^"'`]+)["'`][\s\S]*?methods\s*=\s*\[["'`]([^"'`]+)["'`]\]/g
-      );
-
-      // Extract FastAPI routes
-      const fastapiMatches = file.content.match(
-        /@app\.(get|post|put|delete|patch)\s*\(\s*["'`]([^"'`]+)["'`]/g
-      );
-
-      const allMatches = [
-        ...(routeMatches || []),
-        ...(appMatches || []),
-        ...(fastapiMatches || []),
+      // Enhanced route pattern matching
+      const patterns = [
+        // Express/Node.js patterns
+        /(?:router|app)\.(get|post|put|delete|patch|use)\s*\(\s*["'`]([^"'`]+)["'`]/g,
+        // REST API decorators
+        /@(Get|Post|Put|Delete|Patch)\s*\(\s*["'`]([^"'`]+)["'`]/gi,
+        // Flask patterns
+        /@app\.route\s*\(\s*["'`]([^"'`]+)["'`][\s\S]*?methods\s*=\s*\[["'`]([^"'`]+)["'`]\]/g,
+        // FastAPI patterns
+        /@app\.(get|post|put|delete|patch)\s*\(\s*["'`]([^"'`]+)["'`]/g,
+        // Spring Boot patterns
+        /@(GetMapping|PostMapping|PutMapping|DeleteMapping)\s*\(\s*["'`]([^"'`]+)["'`]/g,
       ];
 
-      // Handle Flask routes separately
-      if (flaskMatches) {
-        flaskMatches.forEach((match) => {
-          const routeMatch = match.match(
-            /@app\.route\s*\(\s*["'`]([^"'`]+)["'`]/
-          );
-          const methodMatch = match.match(
-            /methods\s*=\s*\[["'`]([^"'`]+)["'`]\]/
-          );
+      patterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(file.content)) !== null) {
+          const method = (match[1] || match[2]).toUpperCase();
+          const endpoint = match[2] || match[1];
+          
+          if (endpoint && !endpoint.includes('undefined')) {
+            // Extract more sophisticated parameter information
+            const extractParameters = (endpoint: string, fileContent: string) => {
+              const params = [];
+              
+              // Path parameters
+              const pathParams = endpoint.match(/:(\w+)|\{(\w+)\}|<(\w+)>/g) || [];
+              pathParams.forEach(param => {
+                const cleanParam = param.replace(/[:{})<]/g, '');
+                params.push({
+                  name: cleanParam,
+                  type: 'string',
+                  description: `Path parameter: ${cleanParam}`
+                });
+              });
 
-          if (routeMatch && methodMatch) {
-            const endpoint = routeMatch[1];
-            const method = methodMatch[1].toUpperCase();
+              // Query parameters (look for req.query, request.args, etc.)
+              const queryMatches = fileContent.match(/(?:req\.query|request\.args|params\.get)\.\s*(\w+)/g) || [];
+              queryMatches.slice(0, 3).forEach(query => {
+                const paramName = query.split('.').pop();
+                if (paramName) {
+                  params.push({
+                    name: paramName,
+                    type: 'string',
+                    description: `Query parameter: ${paramName}`
+                  });
+                }
+              });
+
+              // Body parameters
+              const bodyMatches = fileContent.match(/(?:req\.body|request\.json)\.\s*(\w+)/g) || [];
+              bodyMatches.slice(0, 3).forEach(body => {
+                const paramName = body.split('.').pop();
+                if (paramName) {
+                  params.push({
+                    name: paramName,
+                    type: 'any',
+                    description: `Request body parameter: ${paramName}`
+                  });
+                }
+              });
+
+              return params;
+            };
+
+            // Enhanced description extraction
+            const extractDescription = (endpoint: string, method: string, fileContent: string) => {
+              const lines = fileContent.split('\n');
+              let description = `${method} ${endpoint}`;
+              
+              // Look for comments, docstrings, or JSDoc
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes(endpoint)) {
+                  // Check previous lines for comments
+                  for (let j = Math.max(0, i - 3); j < i; j++) {
+                    const line = lines[j].trim();
+                    if (line.startsWith('//') || line.startsWith('*') || line.startsWith('"""')) {
+                      description = line.replace(/^(\/\/|\*|""")?\s*/, '').trim();
+                      break;
+                    }
+                  }
+                  break;
+                }
+              }
+
+              // Infer purpose from endpoint path
+              if (endpoint.includes('/auth') || endpoint.includes('/login')) {
+                description = `Authentication endpoint - ${description}`;
+              } else if (endpoint.includes('/api/')) {
+                description = `API endpoint - ${description}`;
+              }
+
+              return description;
+            };
+
+            const parameters = extractParameters(endpoint, file.content);
+            const description = extractDescription(endpoint, method, file.content);
 
             endpoints.push({
-              endpoint: endpoint.startsWith("/") ? endpoint : `/${endpoint}`,
+              endpoint: endpoint.startsWith('/') ? endpoint : `/${endpoint}`,
               method,
-              description: `${method} ${endpoint} (Flask route)`,
-              parameters: [],
-              response: "JSON response",
+              description,
+              parameters,
+              response: inferResponseType(endpoint, method),
               internals: {
                 implementation: file.path,
-                validation: "Flask request validation",
-                errorHandling: "Flask error handling",
-                authentication: endpoint.includes("auth")
-                  ? "Required"
-                  : "Check implementation",
-              },
+                validation: parameters.length > 0 ? 'Parameter validation required' : 'No validation needed',
+                errorHandling: 'Standard error handling with appropriate HTTP status codes',
+                authentication: inferAuthRequirement(endpoint)
+              }
             });
           }
-        });
-      }
-
-      allMatches.forEach((match) => {
-        const methodMatch = match.match(/(get|post|put|delete|patch)/);
-        const endpointMatch = match.match(/["'`]([^"'`]+)["'`]/);
-
-        if (methodMatch && endpointMatch) {
-          const method = methodMatch[1].toUpperCase();
-          const endpoint = endpointMatch[1];
-
-          // Try to find comments or descriptions near the route
-          const lines = file.content.split("\n");
-          let description = `${method} ${endpoint}`;
-
-          for (let i = 0; i < lines.length; i++) {
-            if (
-              lines[i].includes(endpoint) &&
-              lines[i].includes(method.toLowerCase())
-            ) {
-              // Look for comments above or below
-              if (i > 0 && lines[i - 1].trim().startsWith("//")) {
-                description = lines[i - 1].replace("//", "").trim();
-              } else if (
-                i < lines.length - 1 &&
-                lines[i + 1].trim().startsWith("//")
-              ) {
-                description = lines[i + 1].replace("//", "").trim();
-              }
-              break;
-            }
-          }
-
-          endpoints.push({
-            endpoint: endpoint.startsWith("/") ? endpoint : `/${endpoint}`,
-            method,
-            description,
-            parameters: [],
-            response: "JSON response",
-            internals: {
-              implementation: `${file.path}`,
-              validation: "Express middleware validation",
-              errorHandling: "Standard Express error handling",
-              authentication: endpoint.includes("auth")
-                ? "Required"
-                : "Check implementation",
-            },
-          });
         }
       });
     }
   });
 
-  return endpoints;
+  return endpoints.filter((endpoint, index, self) =>
+    index === self.findIndex(e => e.endpoint === endpoint.endpoint && e.method === endpoint.method)
+  ).sort((a, b) => a.endpoint.localeCompare(b.endpoint));
+}
+
+// Helper functions for better API analysis
+function inferResponseType(endpoint: string, method: string): string {
+  if (method === 'POST' && endpoint.includes('/auth')) return 'Authentication token and user data';
+  if (method === 'GET' && endpoint.includes('/list')) return 'Array of objects with pagination';
+  if (method === 'POST') return 'Created resource data with status';
+  if (method === 'PUT' || method === 'PATCH') return 'Updated resource data';
+  if (method === 'DELETE') return 'Deletion confirmation status';
+  if (method === 'GET') return 'Requested resource data';
+  return 'JSON response with appropriate status';
+}
+
+function inferAuthRequirement(endpoint: string): string {
+  if (endpoint.includes('/auth') || endpoint.includes('/login') || endpoint.includes('/register')) {
+    return 'Public endpoint for authentication';
+  }
+  if (endpoint.includes('/admin') || endpoint.includes('/secure')) {
+    return 'Required - Admin/elevated privileges needed';
+  }
+  if (endpoint.includes('/api/')) {
+    return 'Required - JWT/Token based authentication';
+  }
+  return 'Authentication may be required based on implementation';
 }
 
 export function fallbackSDLCRecommendation(projectData: ProjectData) {
@@ -338,171 +361,64 @@ export function fallbackTestGenerationFromStructure(
   };
 }
 
+// Update the fallbackComprehensiveDocumentationFromFiles function:
+
 export const fallbackComprehensiveDocumentationFromFiles = (
-  files: { path: string; content: string }[],
+  files: Array<{ path: string; content: string }>,
   language: string,
   repositoryName: string
 ) => {
-  // Create a proper file structure overview - ensure we have actual file paths
-  const validFiles = files.filter((f) => f.path && f.path.length > 0);
+  console.log("🔄 Using fallback comprehensive documentation...");
 
-  // Generate folder structure tree
+  const validFiles = files.filter(
+    (f) => f.path && f.path.length > 0 && f.content && f.content.length > 0
+  );
+
+  // Generate folder structure tree with proper formatting
   const folderTree = createFolderStructureTree(validFiles, repositoryName);
+  console.log("📁 Generated folder tree:", folderTree);
 
   // Extract API endpoints
   const apiEndpoints = extractApiEndpoints(validFiles);
 
   // Create directory analysis
   const directories = Array.from(
-    new Set(validFiles.map((f) => f.path.split("/")[0]).filter((dir) => dir))
+    new Set(
+      validFiles
+        .map((f) => {
+          const parts = f.path.split("/");
+          return parts.length > 1 ? parts[0] : null;
+        })
+        .filter((dir): dir is string => dir !== null)
+    )
   ).map((dir) => {
     const dirFiles = validFiles.filter((f) => f.path.startsWith(dir + "/"));
     return {
-      path: dir,
-      type:
-        dir === "src"
-          ? "source"
-          : dir === "test"
-          ? "test"
-          : dir === "config"
-          ? "config"
-          : "other",
-      description: `${dir} directory containing ${dirFiles.length} files`,
+      path: dir + "/",
+      purpose: getDirectoryPurpose(dir),
+      type: getDirectoryType(dir),
       fileCount: dirFiles.length,
-      purpose:
-        dir === "src"
-          ? "Main source code directory"
-          : dir === "components"
-          ? "Reusable UI components"
-          : dir === "pages"
-          ? "Application pages/routes"
-          : dir === "lib"
-          ? "Utility libraries and services"
-          : dir === "helper"
-          ? "Helper functions and utilities"
-          : dir === "types"
-          ? "TypeScript type definitions"
-          : dir === "server"
-          ? "Backend server code"
-          : `${dir} directory`,
+      description: `Contains ${dirFiles.length} files related to ${getDirectoryPurpose(dir).toLowerCase()}`,
     };
   });
 
-  // Extract components from React/Vue files
-  const components = validFiles
-    .filter(
-      (f) =>
-        f.path.endsWith(".tsx") ||
-        f.path.endsWith(".jsx") ||
-        f.path.endsWith(".vue")
-    )
-    .map((f) => {
-      const componentName =
-        f.path
-          .split("/")
-          .pop()
-          ?.replace(/\.(tsx|jsx|vue)$/, "") || "Unknown";
-      return {
-        name: componentName,
-        type: f.path.includes("/pages/")
-          ? "page"
-          : f.path.includes("/components/")
-          ? "component"
-          : "module",
-        file: f.path,
-        description: `${componentName} ${
-          f.path.includes("/pages/") ? "page" : "component"
-        }`,
-        dependencies: [],
-      };
-    });
-
-  // Detect architecture pattern
-  let architecturePattern = "Component-based";
-  if (
-    validFiles.some(
-      (f) => f.path.includes("mvc") || f.path.includes("controller")
-    )
-  ) {
-    architecturePattern = "MVC (Model-View-Controller)";
-  } else if (
-    validFiles.some(
-      (f) => f.path.includes("pages") && f.path.includes("components")
-    )
-  ) {
-    architecturePattern = "Component-based Architecture";
-  } else if (
-    validFiles.some(
-      (f) => f.path.includes("server") && f.path.includes("client")
-    )
-  ) {
-    architecturePattern = "Client-Server Architecture";
-  }
-
-  // Detect technologies
-  const technologies = [];
-  if (
-    validFiles.some(
-      (f) => f.content.includes("react") || f.path.endsWith(".tsx")
-    )
-  ) {
-    technologies.push("React", "TypeScript");
-  }
-  if (
-    validFiles.some(
-      (f) => f.content.includes("express") || f.content.includes("app.get")
-    )
-  ) {
-    technologies.push("Express.js", "Node.js");
-  }
-  if (
-    validFiles.some(
-      (f) => f.content.includes("vite") || f.path.includes("vite")
-    )
-  ) {
-    technologies.push("Vite");
-  }
-  if (validFiles.some((f) => f.content.includes("tailwind"))) {
-    technologies.push("Tailwind CSS");
-  }
-
   return {
-    summary: `${repositoryName} is a ${language} application built with ${
-      technologies.length > 0
-        ? technologies.join(", ")
-        : "modern web technologies"
-    }. The project follows a ${architecturePattern.toLowerCase()} with ${
-      validFiles.length
-    } files organized across ${directories.length} main directories.`,
-
+    summary: `${repositoryName} is a ${language} application with ${validFiles.length} files organized in a structured directory layout.`,
+    
     architecture: {
-      pattern: architecturePattern,
-      description: `The application follows a ${architecturePattern.toLowerCase()} where components are organized into logical directories for maintainability and scalability.`,
-      technologies:
-        technologies.length > 0 ? technologies : [language, "Web Technologies"],
+      pattern: "Component-based",
+      description: "The application follows a modular component-based architecture with clear separation of concerns.",
+      technologies: [language],
       layers: [
         {
           name: "Presentation Layer",
-          description: "User interface components and pages",
-          components: components
-            .filter((c) => c.type === "component" || c.type === "page")
-            .map((c) => c.name),
+          description: "User interface and presentation logic",
+          components: [],
         },
         {
-          name: "Business Logic Layer",
-          description: "Application logic and services",
-          components: validFiles
-            .filter(
-              (f) => f.path.includes("/lib/") || f.path.includes("/helper/")
-            )
-            .map(
-              (f) =>
-                f.path
-                  .split("/")
-                  .pop()
-                  ?.replace(/\.[^.]+$/, "") || ""
-            )
-            .filter((n) => n),
+          name: "Business Logic Layer", 
+          description: "Core application logic and services",
+          components: [],
         },
       ],
     },
@@ -512,36 +428,25 @@ export const fallbackComprehensiveDocumentationFromFiles = (
       directories: directories,
     },
 
-    components: components,
-
-    apis: apiEndpoints,
-
     codeInternals: {
-      codeFlow: `The application starts from the main entry point and routes through various components. ${
-        components.length > 0
-          ? `Key components include ${components
-              .slice(0, 3)
-              .map((c) => c.name)
-              .join(", ")}.`
-          : ""
-      }`,
-      keyAlgorithms: [
-        {
-          name: "Component Rendering",
-          description: "React component lifecycle and rendering process",
-          complexity: "O(n) where n is number of components",
-          file: "src/components/",
-        },
-      ],
+      codeFlow: `The ${repositoryName} application starts from the main entry point and processes through various components organized in the directory structure.`,
+      keyAlgorithms: [],
       designPatterns: [
         {
-          pattern: "Component Pattern",
-          description: "Reusable UI components with props and state management",
-          usage: "Used throughout the application for UI composition",
-          files: components.map((c) => c.file),
+          pattern: "Modular Architecture",
+          usage: "Files are organized into logical directories",
+          files: validFiles.slice(0, 5).map(f => f.path),
+          description: "Separation of concerns through directory structure",
         },
       ],
+      dataFlow: "Data flows through the application layers from input processing to output generation.",
+      businessLogic: [],
     },
+
+    components: [],
+    apis: apiEndpoints,
+    functions: [],
+    dataModels: [],
 
     sdlc: {
       setupInstructions: [
@@ -555,36 +460,49 @@ export const fallbackComprehensiveDocumentationFromFiles = (
           step: 2,
           title: "Start Development Server",
           description: "Run the development server",
-          commands: ["npm run dev", "yarn dev"],
-        },
-        {
-          step: 3,
-          title: "Build for Production",
-          description: "Create production build",
-          commands: ["npm run build", "yarn build"],
+          commands: ["npm run dev", "yarn dev", "npm start"],
         },
       ],
     },
 
     examples: [
       {
-        title: "Component Usage Example",
-        description: "Example of how components are structured in this project",
-        code: `import React from 'react';\n\nconst ExampleComponent = () => {\n  return (\n    <div className="component">\n      <h1>Hello World</h1>\n    </div>\n  );\n};\n\nexport default ExampleComponent;`,
-        explanation:
-          "This shows the basic structure of React components used in the project",
+        title: "Project Structure Example",
+        description: "Example of how the project is organized",
+        code: folderTree,
+        explanation: "The project follows a standard directory structure for better organization and maintainability.",
       },
     ],
 
     mermaidDiagram: `flowchart TD
-    A[App Entry Point] --> B[Router]
-    B --> C[Pages]
-    B --> D[Components]
-    C --> E[UI Components]
-    D --> E
-    E --> F[User Interface]
-    G[Backend/API] --> H[Data Layer]
-    C --> G
-    D --> G`,
+    A[${repositoryName}] --> B[Source Files]
+    B --> C[Components]
+    B --> D[Services]
+    C --> E[User Interface]
+    D --> F[Business Logic]
+    E --> G[Output]
+    F --> G`,
   };
 };
+
+// Helper functions
+function getDirectoryPurpose(dir: string): string {
+  const lowerDir = dir.toLowerCase();
+  if (lowerDir.includes('src') || lowerDir.includes('source')) return 'Source Code';
+  if (lowerDir.includes('test')) return 'Test Files';
+  if (lowerDir.includes('config')) return 'Configuration';
+  if (lowerDir.includes('doc')) return 'Documentation';
+  if (lowerDir.includes('asset') || lowerDir.includes('static')) return 'Static Assets';
+  if (lowerDir.includes('lib') || lowerDir.includes('util')) return 'Utility Libraries';
+  return 'General Files';
+}
+
+function getDirectoryType(dir: string): string {
+  const lowerDir = dir.toLowerCase();
+  if (lowerDir.includes('src') || lowerDir.includes('source')) return 'source';
+  if (lowerDir.includes('test')) return 'test';
+  if (lowerDir.includes('config')) return 'configuration';
+  if (lowerDir.includes('doc')) return 'documentation';
+  if (lowerDir.includes('asset') || lowerDir.includes('static')) return 'assets';
+  return 'other';
+}

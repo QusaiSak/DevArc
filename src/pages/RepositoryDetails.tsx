@@ -29,6 +29,7 @@ import {
   CommitsTab,
   OverviewTab,
 } from "@/components/repository";
+import { ReparseButton } from "@/components/repository/ReparseButton";
 import { ParsingLoader } from "@/components/ui/ParsingLoader";
 import type {
   AnalysisResults,
@@ -627,6 +628,20 @@ ${
             onGenerateDocumentation={generateDocumentation}
             onGenerateTestCases={generateTestCases}
           />
+
+          {/* Re-parse Button: visible above the tabs, only if repository and parsedStructure exist */}
+          {repository && parsedStructure && (
+            <div className="flex justify-end mb-4">
+              <ReparseButton
+                files={parsedStructure.files || []}
+                language={repository.language?.toLowerCase() || "javascript"}
+                onReparse={(result) => {
+                  setParsedStructure(result);
+                  toast.success("Repository structure re-parsed!");
+                }}
+              />
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-6">
