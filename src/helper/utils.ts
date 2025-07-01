@@ -257,23 +257,6 @@ export function parseAiJsonResponseTest(aiText: string): any {
   }
 }
 
-/**
- * Extracts JSON from markdown code blocks
- */
-function extractJsonFromMarkdown(markdown: string): string {
-  // Handle both ```json and ```
-  const jsonBlockRegex = /```(?:json)?\n([\s\S]*?)\n```/;
-  const match = markdown.match(jsonBlockRegex);
-
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-
-  // If no code block, try to find JSON directly
-  const jsonMatch = markdown.match(/\{[\s\S]*\}/);
-  return jsonMatch ? jsonMatch[0] : markdown;
-}
-
 export function parseAiJsonResponse(aiText: string): any {
   if (!aiText || typeof aiText !== 'string') {
     throw new Error('Invalid input: Expected a string');
