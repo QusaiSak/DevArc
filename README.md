@@ -38,7 +38,7 @@ DevArc is an intelligent code analysis and documentation tool that leverages AI 
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/QusaiSak/DevArc.git](https://github.com/QusaiSak/DevArc.git)
+   git clone https://github.com/QusaiSak/DevArc.git
    cd devarc
    ```
 
