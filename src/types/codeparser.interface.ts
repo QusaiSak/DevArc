@@ -113,7 +113,15 @@ export interface ComprehensiveDocumentation {
   architecture: {
     pattern: string;
     description: string;
-    technologies: string[];
+    frontend: {
+      technologies: string[];
+    };
+    backend: {
+      technologies: string[];
+    };
+    database: {
+      technologies: string[];
+    };
     layers: Array<{
       name: string;
       description: string;
@@ -212,7 +220,7 @@ export interface ComprehensiveDocumentation {
     };
   }>;
   apis: Array<{
-    path: string;
+    endpoint: string;
     method: string;
     description: string;
     parameters: Array<{

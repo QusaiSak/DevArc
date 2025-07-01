@@ -275,122 +275,71 @@ function extractJsonFromMarkdown(markdown: string): string {
 }
 
 export function parseAiJsonResponse(aiText: string): any {
-  if (!aiText?.trim()) {
-    throw new Error("Empty AI response");
+  if (!aiText || typeof aiText !== 'string') {
+    throw new Error('Invalid input: Expected a string');
   }
 
+  // First, try to extract JSON from markdown code blocks if present
+  const jsonMatch = aiText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  let jsonString = jsonMatch ? jsonMatch[1] : aiText;
+
+  // Clean up common JSON issues
+  jsonString = jsonString
+    // Remove any non-printable characters except standard JSON ones
+    .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, '')
+    // Fix common JSON syntax issues
+    .replace(/,\s*([}\]])/g, '$1') // Remove trailing commas
+    .replace(/([\{\[]\s*[\}\]])/g, '$1') // Fix empty objects/arrays
+    .replace(/([^\\])'/g, '$1"') // Replace single quotes with double quotes, except escaped ones
+    .replace(/\\'/g, '\'') // Fix escaped single quotes
+    .replace(/"""/g, '\\"""') // Fix triple quotes
+    .replace(/"\s*\+\s*"/g, '') // Fix string concatenation
+    .replace(/\n/g, '\\n') // Escape newlines in strings
+    .replace(/\r/g, '\\r') // Escape carriage returns in strings
+    .replace(/\t/g, '\\t'); // Escape tabs in strings
+
   try {
-    // Try to extract JSON from markdown first
-    let sanitized = extractJsonFromMarkdown(aiText);
-
-    // If we didn't find a code block, use the original text
-    if (!sanitized) {
-      sanitized = aiText.trim();
-    }
-
-    // Remove any remaining markdown code block markers
-    sanitized = sanitized
-      .replace(/```(json)?/g, "")
-      .replace(/`/g, "") // Remove any remaining backticks
-      .trim();
-
-    // Find the first and last braces to extract the JSON object
-    const firstBrace = sanitized.indexOf("{");
-    const lastBrace = sanitized.lastIndexOf("}");
-
-    if (firstBrace === -1 || lastBrace === -1) {
-      throw new Error("No JSON object found in the response");
-    }
-
-    // Extract the JSON part
-    sanitized = sanitized.substring(firstBrace, lastBrace + 1);
-
-    // Remove control characters but preserve newlines and tabs
-    sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
-
-    // Fix common JSON issues
-    // 1. Fix trailing commas
-    sanitized = sanitized.replace(/,\s*([}\]])/g, "$1");
-
-    // 2. Fix unescaped quotes in strings
-    sanitized = sanitized.replace(/(?<!\\)"/g, '\\"').replace(/\\"/g, '"');
-
-    // 3. Fix single quotes (convert to double quotes)
-    sanitized = sanitized.replace(/'/g, '"');
-
-    // 4. Fix unquoted property names
-    sanitized = sanitized.replace(
-      /([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g,
-      '$1"$2"$3'
-    );
-
-    // Check for unbalanced braces and fix them
-    const openCurly = (sanitized.match(/\{/g) || []).length;
-    const closeCurly = (sanitized.match(/\}/g) || []).length;
-
-    if (closeCurly < openCurly) {
-      sanitized += "}".repeat(openCurly - closeCurly);
-    } else if (closeCurly > openCurly) {
-      sanitized =
-        sanitized.replace(/\}/g, "").replace(/\{/g, "") +
-        "{" +
-        "}".repeat(openCurly - closeCurly + 1);
-    }
-
-    const openBracket = (sanitized.match(/\[/g) || []).length;
-    const closeBracket = (sanitized.match(/\]/g) || []).length;
-
-    if (closeBracket < openBracket) {
-      sanitized += "]".repeat(openBracket - closeBracket);
-    } else if (closeBracket > openBracket) {
-      sanitized =
-        sanitized.replace(/\]/g, "").replace(/\[/g, "") +
-        "[" +
-        "]".repeat(openBracket - closeBracket + 1);
-    }
-
-    // Try to parse the sanitized JSON
+    // First try to parse the cleaned JSON directly
+    return JSON.parse(jsonString);
+  } catch (initialError) {
+    console.warn('Initial JSON parse failed, attempting to fix common issues', initialError);
+    
     try {
-      return JSON.parse(sanitized);
-    } catch (parseError) {
-      console.warn(
-        "Initial JSON parse failed, attempting to fix common issues",
-        parseError
-      );
-
-      // If parsing still fails, try to fix more issues
-      // 5. Handle unescaped control characters in strings
-      sanitized = sanitized.replace(/\\([^"\\/bfnrtu])/g, (_, p1) => {
-        return `\\\\${p1}`;
-      });
-
-      // 6. Handle line breaks in strings
-      sanitized = sanitized
-        .replace(/\n/g, "\\\\n")
-        .replace(/\r/g, "\\\\r")
-        .replace(/\t/g, "\\\\t");
-
-      // Try parsing again
-      return JSON.parse(sanitized);
-    }
-  } catch (err) {
-    console.error("JSON parsing failed:", err);
-    console.log("Problematic text:", aiText.substring(0, 500));
-
-    // If all else fails, try to extract any valid JSON object/array
-    try {
-      const jsonMatch = aiText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      // Try to find a JSON object or array in the string
+      const jsonObjectMatch = jsonString.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      if (jsonObjectMatch) {
+        return JSON.parse(jsonObjectMatch[0]);
       }
-    } catch (e) {
-      // Ignore this error and throw the original one
-    }
+      
+      // If no JSON object found, try to fix common issues and parse again
+      let fixedJson = jsonString
+        // Fix unescaped control characters in strings
+        .replace(/\\([^"\\/bfnrtu])/g, (_, p1) => `\\\\${p1}`)
+        // Fix unescaped quotes inside strings
+        .replace(/(?<!\\)"/g, '\\"')
+        // Fix missing quotes around property names
+        .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
 
-    throw new Error(
-      `Could not parse AI response as valid JSON: ${
-        err instanceof Error ? err.message : "Unknown error"
-      }`
-    );
+      return JSON.parse(fixedJson);
+    } catch (finalError) {
+      console.error('JSON parsing failed after all attempts:', finalError);
+      console.log('Problematic text:', jsonString.substring(0, 500));
+      
+      // As a last resort, try to find any valid JSON in the original text
+      try {
+        const anyJsonMatch = aiText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (anyJsonMatch) {
+          return JSON.parse(anyJsonMatch[0]);
+        }
+      } catch (e) {
+        // Ignore this error and throw the original one
+      }
+
+      throw new Error(
+        `Could not parse AI response as valid JSON: ${
+          finalError instanceof Error ? finalError.message : 'Unknown error'
+        }`
+      );
+    }
   }
 }

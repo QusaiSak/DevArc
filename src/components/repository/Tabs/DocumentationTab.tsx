@@ -168,21 +168,32 @@ export const DocumentationTab = memo<DocumentationTabProps>(
                         </p>
                       </div>
                       <div className="p-4 bg-secondary/50 rounded-lg border border-border/30">
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-2">
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-3">
                           Technologies
                         </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {documentation.architecture.technologies?.map(
-                            (tech, index) => (
-                              <Badge
-                                key={index}
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                {tech}
-                              </Badge>
+                        <div className="space-y-4">
+                          {[
+                            { type: 'Frontend', tech: documentation.architecture.frontend.technologies },
+                            { type: 'Backend', tech: documentation.architecture.backend.technologies },
+                            { type: 'Database', tech: documentation.architecture.database.technologies }
+                          ].map(({ type, tech }) => (
+                            tech?.length > 0 && (
+                              <div key={type} className="space-y-2">
+                                <h5 className="text-xs font-medium text-muted-foreground">{type}</h5>
+                                <div className="flex flex-wrap gap-2">
+                                  {tech.map((item: string, idx: number) => (
+                                    <Badge
+                                      key={`${type}-${idx}`}
+                                      variant="outline"
+                                      className="text-xs bg-background/80 hover:bg-background transition-colors"
+                                    >
+                                      {item}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
                             )
-                          )}
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -564,7 +575,7 @@ export const DocumentationTab = memo<DocumentationTabProps>(
                                 {api.method}
                               </Badge>
                               <code className="font-mono text-sm text-foreground bg-muted px-2 py-1 rounded">
-                                {api.path}
+                                {api.endpoint}
                               </code>
                             </div>
                             <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
