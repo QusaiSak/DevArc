@@ -1,5 +1,5 @@
-const { db } = require("./client");
-const { users } = require("./schema");
+const { db } = require("../db/client");
+const { users } = require("../schema/schema");
 const { eq } = require("drizzle-orm");
 
 async function createOrUpdateUser(githubUser) {

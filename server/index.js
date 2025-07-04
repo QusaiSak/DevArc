@@ -13,12 +13,12 @@ const PORT = process.env.PORT;
 // GitHub OAuth configuration
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
-const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Middleware
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CLIENT_URL,
     credentials: true,
   })
 );
@@ -38,7 +38,6 @@ app.get("/auth/github", (req, res) => {
   }
 
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=user:email,repo&redirect_uri=${process.env.CLIENT_URL}/auth/callback`;
-  console.log("Redirect URL:", githubAuthUrl);
   res.redirect(githubAuthUrl);
 });
 
@@ -63,12 +62,6 @@ app.post("/auth/github/callback", async (req, res) => {
       client_secret: GITHUB_CLIENT_SECRET,
       code: code,
     };
-
-    console.log("Token request data:", {
-      client_id: tokenRequestData.client_id,
-      client_secret: tokenRequestData.client_secret ? "Present" : "Missing",
-      code: tokenRequestData.code ? "Present" : "Missing",
-    });
 
     const tokenResponse = await axios.post(
       "https://github.com/login/oauth/access_token",
@@ -99,8 +92,6 @@ app.post("/auth/github/callback", async (req, res) => {
       });
     }
 
-    console.log("Access token received, fetching user info...");
-
     // Get user information
     const userResponse = await axios.get("https://api.github.com/user", {
       headers: {
@@ -124,8 +115,6 @@ app.post("/auth/github/callback", async (req, res) => {
     const emails = emailResponse.data;
     const primaryEmail =
       emails.find((email) => email.primary)?.email || user.email;
-
-    console.log("User authenticated successfully:", user.login);
 
     // Save/update user in database
     const dbUser = await createOrUpdateUser({

@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -487,11 +487,24 @@ ${documentation.summary || "No summary available"}
 
 ### Technologies Used
 ${
-  documentation.architecture?.technologies
+  documentation.architecture?.frontend?.technologies
     ?.map((tech) => `- ${tech}`)
     .join("\n") || "No technologies specified"
 }
 
+### Technologies Used
+${
+  documentation.architecture?.backend?.technologies
+    ?.map((tech) => `- ${tech}`)
+    .join("\n") || "No technologies specified"
+}
+
+### Technologies Used
+${
+  documentation.architecture?.database?.technologies
+    ?.map((tech) => `- ${tech}`)
+    .join("\n") || "No technologies specified"
+}
 ---
 *Generated on ${new Date().toLocaleDateString()} for ${
         repository?.full_name || "Repository"

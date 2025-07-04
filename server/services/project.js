@@ -1,5 +1,5 @@
-const { db } = require("./client");
-const { projects } = require("./schema");
+const { db } = require("../db/client");
+const { projects } = require("../schema/schema");
 const { eq, desc, and } = require("drizzle-orm");
 
 async function createProject(projectData) {

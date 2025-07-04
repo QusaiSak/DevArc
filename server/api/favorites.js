@@ -4,7 +4,7 @@ const {
   removeFavorite,
   isFavorite,
   getFavorites,
-} = require("../db/favorites");
+} = require("../services/favorites");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
@@ -17,10 +17,7 @@ const authenticate = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-jwt-secret"
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch {

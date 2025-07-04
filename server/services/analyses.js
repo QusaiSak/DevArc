@@ -1,5 +1,5 @@
-const { db } = require("./client");
-const { analyses } = require("./schema");
+const { db } = require("../db/client");
+const { analyses } = require("../schema/schema");
 const { eq, and, desc } = require("drizzle-orm");
 
 async function saveAnalysis(userId, data) {

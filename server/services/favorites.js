@@ -1,5 +1,5 @@
-const { db } = require("./client");
-const { favorites } = require("./schema");
+const { db } = require("../db/client");
+const { favorites } = require("../schema/schema");
 const { eq, and } = require("drizzle-orm");
 
 async function addFavorite({ userId, repo }) {
