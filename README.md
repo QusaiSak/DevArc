@@ -37,12 +37,14 @@ DevArc is an intelligent code analysis and documentation tool that leverages AI 
 ## 🛠️ Installation
 
 1. Clone the repository:
+
    ```bash
-   git clone https://github.com/QusaiSak/devarc.git
+   git clone https://github.com/QusaiSak/DevArc.git
    cd devarc
    ```
 
 2. Install dependencies:
+
    ```bash
    npm install
    # or
@@ -50,6 +52,7 @@ DevArc is an intelligent code analysis and documentation tool that leverages AI 
    ```
 
 3. Create a `.env` file in the root directory and add your environment variables:
+
    ```env
    VITE_OPENROUTER_API_KEY=your_openrouter_api_key
    VITE_GITHUB_TOKEN=your_github_token
@@ -57,6 +60,7 @@ DevArc is an intelligent code analysis and documentation tool that leverages AI 
    ```
 
 4. Run database migrations (if applicable):
+
    ```bash
    npx drizzle-kit push:pg
    ```
@@ -71,10 +75,12 @@ DevArc is an intelligent code analysis and documentation tool that leverages AI 
 ## 🚀 Usage
 
 1. **Import a Repository**:
+
    - Click on "Import Repository" and enter the GitHub repository URL
    - Or clone a repository locally and open it in DevArc
 
 2. **Generate Documentation**:
+
    - Navigate to the "Documentation" tab
    - Click "Generate Documentation" to start the analysis
    - View the automatically generated documentation
